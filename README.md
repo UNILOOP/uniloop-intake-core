@@ -1577,7 +1577,7 @@ We welcome contributions! To contribute:
 
 ```bash
 # Clone the repository
-git clone https://github.com/UNISELL-DEV/react-survey-builder.git
+git clone https://github.com/UNILOOP/react-survey-builder.git
 cd react-survey-builder/src/packages/survey-form-package
 
 # Install dependencies
@@ -1608,6 +1608,6 @@ This package is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 📞 Support
 
 - 📧 **Email**: sayeed99@live.com
-- 🐛 **Issues**: [GitHub Issues](https://github.com/UNISELL-DEV/react-survey-builder/issues)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/UNILOOP/react-survey-builder/issues)
 
 ---

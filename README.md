@@ -47,11 +47,73 @@ A powerful, customizable React intake form renderer and builder library with Typ
 
 ## Installation
 
+This package is not published to npm. Add it to your project as a **git submodule** or copy it as a **local package**.
+
+### Option 1: Git Submodule (Recommended)
+
 ```bash
-npm install survey-form-package
+# Add the submodule into your project's packages directory
+git submodule add <repo-url> <your-packages-path>/survey-form-package
+
+# Initialize and pull
+git submodule update --init --recursive
+```
+
+### Option 2: Copy as Local Package
+
+```bash
+cp -r /path/to/survey-form-package <your-packages-path>/survey-form-package
+```
+
+### Configure Path Alias
+
+Set up a path alias in your bundler so imports resolve cleanly. The package location depends on your project structure (e.g., `src/packages/*`, `resources/js/packages/*`, etc.).
+
+**Vite example:**
+```ts
+// vite.config.ts
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@/packages/survey-form-package': path.resolve(__dirname, '<your-packages-path>/survey-form-package'),
+    },
+  },
+});
+```
+
+**TypeScript:**
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "paths": {
+      "@/packages/survey-form-package/*": ["<your-packages-path>/survey-form-package/*"]
+    }
+  }
+}
+```
+
+### Install Dependencies
+
+The package has its own `package.json`. Install from the package directory:
+
+```bash
+cd <your-packages-path>/survey-form-package
+npm install
+```
+
+Or add the package path to your root `package.json` workspaces:
+
+```json
+{
+  "workspaces": ["<your-packages-path>/survey-form-package"]
+}
 ```
 
 ### Peer Dependencies
+
+Your host project must have these installed:
+
 ```json
 {
   "react": "^19.1.0",
@@ -59,6 +121,30 @@ npm install survey-form-package
   "lucide-react": "^0.525.0"
 }
 ```
+
+### Import Paths
+
+Throughout this README, imports use a short form for readability:
+
+```tsx
+import SurveyForm from 'survey-form-package';
+```
+
+In practice, use the path alias you configured:
+
+```tsx
+// Renderer imports
+import SurveyForm from '@/packages/survey-form-package/src';
+import { useSurveyForm, registerBlock, registerLayout } from '@/packages/survey-form-package/src';
+import type { LayoutProps, BlockDefinition } from '@/packages/survey-form-package/src/types';
+
+// Builder imports (separate entry point)
+import { SurveyBuilder, StandardBlocks, StandardNodes } from '@/packages/survey-form-package/src/builder';
+```
+
+The package has two entry points:
+- **`src/index.tsx`** — Renderer: `SurveyForm`, hooks, themes, block/layout registries, utilities
+- **`src/builder.tsx`** — Builder: `SurveyBuilder`, block/node definitions, builder context
 
 ## Quick Start
 

@@ -3,7 +3,7 @@ import { SurveyForm } from './src/renderer/SurveyForm';
 
 // Example demo component showing how to save and resume survey forms
 export const SurveyResumeDemo: React.FC = () => {
-  const [savedAnswers, setSavedAnswers] = useState<Record<string, any> | null>(null);
+  const [savedAnswers, setSavedAnswers] = useState<Record<string, any>>({});
   const [savedPage, setSavedPage] = useState<number>(0);
   const [isResuming, setIsResuming] = useState(false);
 
@@ -50,7 +50,7 @@ export const SurveyResumeDemo: React.FC = () => {
   const clearSavedData = () => {
     localStorage.removeItem('surveyAnswers');
     localStorage.removeItem('surveyPage');
-    setSavedAnswers(null);
+    setSavedAnswers({});
     setSavedPage(0);
     setIsResuming(false);
   };

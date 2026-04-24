@@ -1,39 +1,29 @@
-import type { AnalyticsProvider, SurveyAnalyticsEvent } from '../types';
-
-interface MetaEventData {
-  event_name: string;
-  event_time: number;
-  event_id?: string;
-  user_data?: {
-    external_id?: string;
-  };
-  custom_data?: Record<string, any>;
-}
+import type { AnalyticsEventMappings, AnalyticsProvider, SurveyAnalyticsEvent } from '../types';
 
 export class MetaPixelProvider implements AnalyticsProvider {
   name = 'MetaPixel';
   private initialized = false;
   private pixelId: string = '';
-  private accessToken?: string;
   private testEventCode?: string;
   private sessionId?: string;
   private userId?: string;
   private debug = false;
+  private eventMappings?: AnalyticsEventMappings;
 
   async initialize(config: {
     pixelId: string;
-    accessToken?: string;
     testEventCode?: string;
     debug?: boolean;
     sessionId?: string;
     userId?: string;
+    eventMappings?: AnalyticsEventMappings;
   }): Promise<void> {
     this.pixelId = config.pixelId;
-    this.accessToken = config.accessToken;
     this.testEventCode = config.testEventCode;
     this.debug = config.debug || false;
     this.sessionId = config.sessionId;
     this.userId = config.userId;
+    this.eventMappings = config.eventMappings;
 
     if (this.debug) {
       console.log('[MetaPixel] Initializing with pixel ID:', this.pixelId);
@@ -141,8 +131,34 @@ export class MetaPixelProvider implements AnalyticsProvider {
   }
 
   private mapEventToMetaEvent(event: SurveyAnalyticsEvent): { eventName: string; customData: Record<string, any> } {
-    let eventName = 'Survey';
-    const customData: Record<string, any> = {
+    // Start from the merchant mapping (sent by the backend via /api/analytics/config).
+    // Mapping shape is action → channel → { name, field_map }, so we index
+    // into the meta channel specifically.
+    const mapping = this.eventMappings?.events?.[event.action]?.meta;
+
+    let eventName: string;
+    if (mapping?.name) {
+      eventName = mapping.name;
+    } else {
+      switch (event.action) {
+        case 'survey_start':
+          eventName = 'StartTrial';
+          break;
+        case 'survey_complete':
+          eventName = 'CompleteRegistration';
+          break;
+        case 'page_view':
+          eventName = 'PageView';
+          break;
+        case 'field_complete':
+          eventName = 'Survey';
+          break;
+        default:
+          eventName = 'Survey';
+      }
+    }
+
+    const rawData: Record<string, any> = {
       category: event.category,
       action: event.action,
       label: event.label,
@@ -150,41 +166,21 @@ export class MetaPixelProvider implements AnalyticsProvider {
       session_id: event.sessionId || this.sessionId,
       user_id: event.userId || this.userId,
       survey_id: event.surveyId,
-      timestamp: event.timestamp || Date.now()
+      timestamp: event.timestamp || Date.now(),
+      ...(event.metadata ?? {}),
     };
-
-    // Map survey actions to standard Meta events where applicable
-    switch (event.action) {
-      case 'survey_start':
-        eventName = 'StartTrial'; // Or 'Lead' depending on use case
-        break;
-      case 'survey_complete':
-        eventName = 'CompleteRegistration';
-        customData.content_name = 'Survey Completion';
-        break;
-      case 'page_view':
-        eventName = 'PageView';
-        break;
-      case 'field_complete':
-        eventName = 'Survey';
-        customData.content_name = 'Field Completed';
-        break;
-      default:
-        eventName = 'Survey';
-        customData.content_name = event.action;
+    if (!mapping?.name) {
+      if (event.action === 'survey_complete') rawData.content_name = 'Survey Completion';
+      else if (event.action === 'field_complete') rawData.content_name = 'Field Completed';
+      else if (!['survey_start', 'page_view'].includes(event.action)) rawData.content_name = event.action;
     }
 
-    // Add metadata
-    if (event.metadata) {
-      Object.keys(event.metadata).forEach(key => {
-        customData[key] = event.metadata[key];
-      });
+    const fieldMap = mapping?.field_map ?? {};
+    const customData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(rawData)) {
+      if (value === undefined) continue;
+      customData[fieldMap[key] ?? key] = value;
     }
-
-    // Remove undefined values
-    Object.keys(customData).forEach(key =>
-      customData[key] === undefined && delete customData[key]
-    );
 
     return { eventName, customData };
   }
@@ -193,14 +189,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
     if (!this.initialized || !window.fbq) return;
 
     const { eventName, customData } = this.mapEventToMetaEvent(event);
-
-    // Track with Facebook Pixel
     window.fbq('track', eventName, customData);
-
-    // If Conversion API is configured, send server-side event
-    if (this.accessToken) {
-      this.sendConversionAPIEvent(eventName, customData);
-    }
 
     if (this.debug) {
       console.log('[MetaPixel] Event tracked:', eventName, customData);
@@ -218,17 +207,11 @@ export class MetaPixelProvider implements AnalyticsProvider {
       ...additionalData
     };
 
-    // Remove undefined values
     Object.keys(pageData).forEach(key =>
-      pageData[key] === undefined && delete pageData[key]
+      (pageData as any)[key] === undefined && delete (pageData as any)[key]
     );
 
     window.fbq('track', 'PageView', pageData);
-
-    // If Conversion API is configured, send server-side event
-    if (this.accessToken) {
-      this.sendConversionAPIEvent('PageView', pageData);
-    }
 
     if (this.debug) {
       console.log('[MetaPixel] Page view tracked:', pageData);
@@ -291,55 +274,6 @@ export class MetaPixelProvider implements AnalyticsProvider {
 
     if (this.debug) {
       console.log('[MetaPixel] Custom dimensions set:', dimensions);
-    }
-  }
-
-  private async sendConversionAPIEvent(
-    eventName: string,
-    customData: Record<string, any>
-  ): Promise<void> {
-    if (!this.accessToken) return;
-
-    try {
-      const eventData: MetaEventData = {
-        event_name: eventName,
-        event_time: Math.floor(Date.now() / 1000),
-        event_id: `${this.sessionId}_${Date.now()}`, // Deduplication ID
-        user_data: {
-          external_id: this.userId || this.sessionId
-        },
-        custom_data: customData
-      };
-
-      const payload: any = {
-        data: [eventData]
-      };
-
-      // Add test event code if provided
-      if (this.testEventCode) {
-        payload.test_event_code = this.testEventCode;
-      }
-
-      const url = `https://graph.facebook.com/v18.0/${this.pixelId}/events?access_token=${this.accessToken}`;
-
-      // Send to Conversion API
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('[MetaPixel] Conversion API error:', errorData);
-      } else if (this.debug) {
-        const responseData = await response.json();
-        console.log('[MetaPixel] Conversion API response:', responseData);
-      }
-    } catch (error) {
-      console.error('[MetaPixel] Failed to send Conversion API event:', error);
     }
   }
 

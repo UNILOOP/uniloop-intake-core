@@ -1,4 +1,4 @@
-import type { AnalyticsProvider, SurveyAnalyticsEvent, GTMDataLayerEvent } from '../types';
+import type { AnalyticsEventMappings, AnalyticsProvider, SurveyAnalyticsEvent, GTMDataLayerEvent } from '../types';
 
 export class GoogleTagManagerProvider implements AnalyticsProvider {
   name = 'GoogleTagManager';
@@ -7,19 +7,22 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
   private sessionId?: string;
   private userId?: string;
   private debug = false;
+  private eventMappings?: AnalyticsEventMappings;
 
-  async initialize(config: { 
-    containerId: string; 
+  async initialize(config: {
+    containerId: string;
     auth?: string;
     preview?: string;
     debug?: boolean;
     sessionId?: string;
     userId?: string;
+    eventMappings?: AnalyticsEventMappings;
   }): Promise<void> {
     this.containerId = config.containerId;
     this.debug = config.debug || false;
     this.sessionId = config.sessionId;
     this.userId = config.userId;
+    this.eventMappings = config.eventMappings;
 
     // Initialize dataLayer if it doesn't exist
     window.dataLayer = window.dataLayer || [];
@@ -123,8 +126,11 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
   trackEvent(event: SurveyAnalyticsEvent): void {
     if (!this.initialized) return;
 
-    const gtmEvent: GTMDataLayerEvent = {
-      event: `survey.${event.action}`,
+    const mapping = this.eventMappings?.events?.[event.action]?.google_tag_manager;
+    const eventName = mapping?.name ?? `survey.${event.action}`;
+
+    const rawEvent: GTMDataLayerEvent = {
+      event: eventName,
       survey_category: event.category,
       survey_action: event.action,
       survey_label: event.label,
@@ -135,32 +141,35 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
       timestamp: event.timestamp || Date.now()
     };
 
-    // Add metadata fields, especially field responses for field_complete events
     if (event.metadata) {
-      // For field_complete events, ensure field response is prominently included
+      const metadata = event.metadata;
       if (event.action === 'field_complete') {
-        gtmEvent.field_id = event.metadata.fieldId;
-        gtmEvent.field_type = event.metadata.fieldType;
-        gtmEvent.field_label = event.metadata.fieldLabel;
-        gtmEvent.field_value = event.metadata.fieldValue;
-        
-        // Include the raw response for analysis
-        if (event.metadata.fieldResponse !== undefined) {
-          gtmEvent.field_response = event.metadata.fieldResponse;
+        rawEvent.field_id = metadata.fieldId;
+        rawEvent.field_type = metadata.fieldType;
+        rawEvent.field_label = metadata.fieldLabel;
+        rawEvent.field_value = metadata.fieldValue;
+        if (metadata.fieldResponse !== undefined) {
+          rawEvent.field_response = metadata.fieldResponse;
         }
       }
-      
-      // Include all metadata
-      Object.keys(event.metadata).forEach(key => {
-        if (!gtmEvent.hasOwnProperty(key)) {
-          gtmEvent[key] = event.metadata[key];
+      Object.keys(metadata).forEach(key => {
+        if (!rawEvent.hasOwnProperty(key)) {
+          rawEvent[key] = metadata[key];
         }
       });
     }
 
+    const fieldMap = mapping?.field_map;
+    const gtmEvent: GTMDataLayerEvent = fieldMap && Object.keys(fieldMap).length > 0
+      ? Object.fromEntries(
+          Object.entries(rawEvent).map(([key, value]) =>
+            key === 'event' ? [key, value] : [fieldMap[key] ?? key, value],
+          ),
+        ) as GTMDataLayerEvent
+      : rawEvent;
+
     this.pushToDataLayer(gtmEvent);
 
-    // Also push a generic survey_event for catch-all triggers
     this.pushToDataLayer({
       event: 'survey_event',
       eventDetails: gtmEvent

@@ -335,6 +335,14 @@ export interface SurveyFormRendererProps {
     sessionId?: string;
     userId?: string;
     surveyId?: string;
+    /**
+     * Merchant-defined event mapping. Threaded into the internal Meta + GTM
+     * providers so their browser pixels honor the same custom event names
+     * and field maps the backend resolver applies. Passed as `unknown`
+     * shape here — the providers accept `AnalyticsEventMappings` and the
+     * host app supplies the concrete type.
+     */
+    eventMappings?: import('./analytics/types').AnalyticsEventMappings;
     googleAnalytics?: {
       measurementId: string;
       debug?: boolean;
@@ -344,12 +352,14 @@ export interface SurveyFormRendererProps {
       auth?: string;
       preview?: string;
       debug?: boolean;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
     };
     meta?: {
       pixelId: string;
       accessToken?: string;
       testEventCode?: string;
       debug?: boolean;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
     };
     trackEvent?: (event: any) => void;
     trackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;

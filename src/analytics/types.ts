@@ -1,11 +1,34 @@
 // Analytics provider types and interfaces
 
+/**
+ * Merchant-defined event mapping. Same shape as the one the backend returns
+ * from /api/analytics/config. Kept as an unknown-valued object here so this
+ * package does not need to depend on the host app's schema module.
+ */
+export interface AnalyticsEventMappings {
+  version?: number;
+  events?: Record<string, Record<string, { name?: string; field_map?: Record<string, string> }>>;
+  custom_events?: Array<{
+    key: string;
+    trigger_event: string;
+    condition?: { path?: string; op?: string; value?: unknown } | null;
+    channels: Record<string, { name?: string; field_map?: Record<string, string> }>;
+  }>;
+}
+
 export interface AnalyticsConfig {
   // Session identifier for tracking
   sessionId?: string;
   userId?: string;
   customDimensions?: Record<string, any>;
-  
+
+  /**
+   * Merchant mapping config. When present, the Meta + GTM providers use it
+   * to translate canonical event names and rewrite payload keys so the
+   * browser pixel aligns with the server-side resolver.
+   */
+  eventMappings?: AnalyticsEventMappings;
+
   // Google Analytics configuration
   googleAnalytics?: {
     measurementId: string;
@@ -17,6 +40,7 @@ export interface AnalyticsConfig {
     auth?: string;
     preview?: string;
     debug?: boolean;
+    eventMappings?: AnalyticsEventMappings;
   };
   // Meta (Facebook) Pixel and Conversion API configuration
   meta?: {
@@ -24,6 +48,7 @@ export interface AnalyticsConfig {
     accessToken?: string; // For Conversion API
     testEventCode?: string; // For testing events
     debug?: boolean;
+    eventMappings?: AnalyticsEventMappings;
   };
   // Custom event handler function
   trackEvent?: (event: any) => void;

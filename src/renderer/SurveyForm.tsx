@@ -232,24 +232,30 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   );
 
   // Prepare analytics configuration - memoize to prevent recreation
-  const analyticsConfig: AnalyticsConfig = React.useMemo(
-    () =>
-      analytics
-        ? {
-            sessionId: analytics.sessionId,
-            userId: analytics.userId,
-            customDimensions: analytics.customDimensions,
-            googleAnalytics: analytics.googleAnalytics,
-            googleTagManager: analytics.googleTagManager,
-            meta: analytics.meta,
-            trackEvent: analytics.trackEvent,
-            trackPageView: analytics.trackPageView,
-            trackTiming: analytics.trackTiming,
-            setUserProperties: analytics.setUserProperties,
-          }
-        : {},
-    [analytics]
-  );
+  const analyticsConfig: AnalyticsConfig = React.useMemo(() => {
+    if (!analytics) return {};
+    // When the host app supplies a merchant mapping alongside a channel
+    // config, thread it into that channel's init payload so the provider's
+    // mapEventToXxx() honors it.
+    const mappings = analytics.eventMappings;
+    return {
+      sessionId: analytics.sessionId,
+      userId: analytics.userId,
+      customDimensions: analytics.customDimensions,
+      eventMappings: mappings,
+      googleAnalytics: analytics.googleAnalytics,
+      googleTagManager: analytics.googleTagManager
+        ? { ...analytics.googleTagManager, eventMappings: analytics.googleTagManager.eventMappings ?? mappings }
+        : undefined,
+      meta: analytics.meta
+        ? { ...analytics.meta, eventMappings: analytics.meta.eventMappings ?? mappings }
+        : undefined,
+      trackEvent: analytics.trackEvent,
+      trackPageView: analytics.trackPageView,
+      trackTiming: analytics.trackTiming,
+      setUserProperties: analytics.setUserProperties,
+    };
+  }, [analytics]);
 
   // Determine if analytics should be enabled
   const isAnalyticsEnabled = React.useMemo(

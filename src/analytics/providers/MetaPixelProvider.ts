@@ -182,6 +182,8 @@ export class MetaPixelProvider implements AnalyticsProvider {
       customData[fieldMap[key] ?? key] = value;
     }
 
+    Object.assign(customData, mapping?.extra_fields ?? {});
+
     return { eventName, customData };
   }
 

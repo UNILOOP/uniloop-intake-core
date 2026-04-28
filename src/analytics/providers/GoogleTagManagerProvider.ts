@@ -168,6 +168,8 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
         ) as GTMDataLayerEvent
       : rawEvent;
 
+    Object.assign(gtmEvent, mapping?.extra_fields ?? {});
+
     this.pushToDataLayer(gtmEvent);
 
     this.pushToDataLayer({

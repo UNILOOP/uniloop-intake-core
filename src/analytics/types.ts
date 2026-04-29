@@ -7,12 +7,13 @@
  */
 export interface AnalyticsEventMappings {
   version?: number;
-  events?: Record<string, Record<string, { name?: string; field_map?: Record<string, string>; extra_fields?: Record<string, unknown> }>>;
+  global_drop_keys?: Record<string, string[]>;
+  events?: Record<string, Record<string, { name?: string; field_map?: Record<string, string>; drop_keys?: string[]; extra_fields?: Record<string, unknown> }>>;
   custom_events?: Array<{
     key: string;
     trigger_event: string;
     condition?: { path?: string; op?: string; value?: unknown } | null;
-    channels: Record<string, { name?: string; field_map?: Record<string, string>; extra_fields?: Record<string, unknown> }>;
+    channels: Record<string, { name?: string; field_map?: Record<string, string>; drop_keys?: string[]; extra_fields?: Record<string, unknown> }>;
   }>;
 }
 

@@ -176,9 +176,15 @@ export class MetaPixelProvider implements AnalyticsProvider {
     }
 
     const fieldMap = mapping?.field_map ?? {};
+    // Union per-event drop_keys with the channel-scoped global_drop_keys.meta —
+    // mirrors EventMappingResolver::withGlobalDrops() on the server.
+    const dropSet = new Set<string>([
+      ...(mapping?.drop_keys ?? []),
+      ...(this.eventMappings?.global_drop_keys?.meta ?? []),
+    ]);
     const customData: Record<string, any> = {};
     for (const [key, value] of Object.entries(rawData)) {
-      if (value === undefined) continue;
+      if (value === undefined || dropSet.has(key)) continue;
       customData[fieldMap[key] ?? key] = value;
     }
 

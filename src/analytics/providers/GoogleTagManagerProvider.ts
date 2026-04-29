@@ -160,13 +160,17 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
     }
 
     const fieldMap = mapping?.field_map;
-    const gtmEvent: GTMDataLayerEvent = fieldMap && Object.keys(fieldMap).length > 0
-      ? Object.fromEntries(
-          Object.entries(rawEvent).map(([key, value]) =>
-            key === 'event' ? [key, value] : [fieldMap[key] ?? key, value],
-          ),
-        ) as GTMDataLayerEvent
-      : rawEvent;
+    // Union per-event drop_keys with channel-scoped global_drop_keys.google_tag_manager.
+    // The 'event' key is the dataLayer event name itself, so never droppable/renameable.
+    const dropSet = new Set<string>([
+      ...(mapping?.drop_keys ?? []),
+      ...(this.eventMappings?.global_drop_keys?.google_tag_manager ?? []),
+    ]);
+    const gtmEvent: GTMDataLayerEvent = { event: rawEvent.event };
+    for (const [key, value] of Object.entries(rawEvent)) {
+      if (key === 'event' || dropSet.has(key)) continue;
+      gtmEvent[fieldMap?.[key] ?? key] = value;
+    }
 
     Object.assign(gtmEvent, mapping?.extra_fields ?? {});
 

@@ -450,7 +450,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
 
       if (nextFieldIndex >= multiFieldState.fields.length) {
         // All fields collected - call blockFunctions and finalize
-        let finalValue = { ...newCollectedValues };
+        const finalValue = { ...newCollectedValues };
 
         // Call blockFunctions if available
         if (multiFieldState.blockDefinition?.blockFunctions) {

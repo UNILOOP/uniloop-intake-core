@@ -342,8 +342,8 @@ export const SurveyGraph: React.FC<SurveyGraphProps> = ({
 
       // Process navigation rule items
       if (isPageNode && itemsWithNavRules.length > 0) {
-        let navNodeX = flowNode.x + LAYOUT_CONFIG.NAV_NODE_OFFSET_X;
-        let navNodeY = flowNode.y + flowNode.height + LAYOUT_CONFIG.NAV_NODE_OFFSET_Y;
+        const navNodeX = flowNode.x + LAYOUT_CONFIG.NAV_NODE_OFFSET_X;
+        const navNodeY = flowNode.y + flowNode.height + LAYOUT_CONFIG.NAV_NODE_OFFSET_Y;
         
         itemsWithNavRules.forEach((item, index) => {
           const navNodeId = `${item.uuid}_nav`;
@@ -428,8 +428,8 @@ export const SurveyGraph: React.FC<SurveyGraphProps> = ({
           }
         });
 
-        let targetX = flowNode.x + LAYOUT_CONFIG.LEVEL_SPACING;
-        let targetY = flowNode.y;
+        const targetX = flowNode.x + LAYOUT_CONFIG.LEVEL_SPACING;
+        const targetY = flowNode.y;
         
         Array.from(allTargets).forEach((targetId, index) => {
           const targetNode = nodeMap.get(targetId);

@@ -154,7 +154,7 @@ const surveyBuilderReducer = (
         }
 
         let updated = false;
-        let updatedNode = { ...node };
+        const updatedNode = { ...node };
 
         // Handle items array (new structure) - items are BlockData
         if (node.items) {
@@ -210,7 +210,7 @@ const surveyBuilderReducer = (
           return null;
         }
 
-        let updatedNode = { ...node };
+        const updatedNode = { ...node };
         let hasChanges = false;
 
         // Handle items array (new structure) - items are BlockData

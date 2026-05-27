@@ -673,7 +673,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
 
       if (!sourceBlock) return;
 
-      let updatedBlock = { ...sourceBlock };
+      const updatedBlock = { ...sourceBlock };
 
       if (rule && typeof ruleIndex === 'number') {
         // This is an explicit navigation rule - update the rule's target
@@ -1020,7 +1020,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       // Extract edge data to determine what type of edge this is
       const edgeData = oldEdge.data as { rule?: any; ruleIndex?: number } | undefined;
 
-      let updatedBlock = { ...sourceBlock };
+      const updatedBlock = { ...sourceBlock };
 
       if (edgeData?.rule && typeof edgeData.ruleIndex === 'number') {
         // This is an explicit navigation rule - update the rule's target

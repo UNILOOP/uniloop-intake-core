@@ -960,7 +960,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
     updateComputedValues();
 
-    let hasErrors = false;
+    const hasErrors = false;
     const allFields = pages.flat()
       .filter(block => block.fieldName)
       .map(block => block.fieldName as string);

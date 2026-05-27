@@ -467,7 +467,7 @@ const CalculatedFieldRenderer: React.FC<CalculatedFieldProps> = ({
         setError(null);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [values, computedValues, dependencies, formula, format, block.fieldName, updateComputedValues]);
 
   return (

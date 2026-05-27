@@ -173,7 +173,7 @@ function localValidation(request: VoiceValidationRequest): VoiceValidationRespon
       'first': 1, '1st': 1, 'second': 2, '2nd': 2, 'third': 3, '3rd': 3,
       'fourth': 4, '4th': 4, 'fifth': 5, '5th': 5,
     };
-    let index = numberMatch[1]
+    const index = numberMatch[1]
       ? parseInt(numberMatch[1], 10) - 1
       : numberWords[numberMatch[2]?.toLowerCase() || ''] - 1;
 

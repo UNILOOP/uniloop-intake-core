@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -43,6 +44,7 @@ import { CSS } from '@dnd-kit/utilities';
 interface MatrixQuestion {
   id: string;
   text: string;
+  required?: boolean;
 }
 
 interface MatrixOption {
@@ -104,6 +106,16 @@ const MatrixBlockForm: React.FC<ContentBlockItemProps> = ({
     newQuestions[index] = {
       ...newQuestions[index],
       text,
+    };
+    handleChange('questions', newQuestions);
+  };
+
+  // Handle toggling whether a question requires an answer
+  const handleToggleQuestionRequired = (index: number, required: boolean) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = {
+      ...newQuestions[index],
+      required,
     };
     handleChange('questions', newQuestions);
   };
@@ -239,6 +251,7 @@ const MatrixBlockForm: React.FC<ContentBlockItemProps> = ({
                   question={question}
                   index={index}
                   onUpdateQuestion={handleUpdateQuestion}
+                  onUpdateQuestionRequired={handleToggleQuestionRequired}
                   onRemoveQuestion={handleRemoveQuestion}
                 />
               ))}
@@ -595,6 +608,7 @@ interface SortableMatrixQuestionProps {
   question: MatrixQuestion;
   index: number;
   onUpdateQuestion: (index: number, text: string) => void;
+  onUpdateQuestionRequired: (index: number, required: boolean) => void;
   onRemoveQuestion: (index: number) => void;
 }
 
@@ -602,6 +616,7 @@ const SortableMatrixQuestion: React.FC<SortableMatrixQuestionProps> = ({
   question,
   index,
   onUpdateQuestion,
+  onUpdateQuestionRequired,
   onRemoveQuestion,
 }) => {
   const {
@@ -639,6 +654,18 @@ const SortableMatrixQuestion: React.FC<SortableMatrixQuestionProps> = ({
           placeholder="Question text"
         />
       </div>
+      <Label
+        className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap cursor-pointer"
+        title="Require an answer for this row"
+      >
+        <Checkbox
+          checked={question.required ?? false}
+          onCheckedChange={(checked) =>
+            onUpdateQuestionRequired(index, Boolean(checked))
+          }
+        />
+        Required
+      </Label>
       <Button
         type="button"
         variant="ghost"
@@ -1007,6 +1034,26 @@ export const MatrixBlock: BlockDefinition = {
       return 'At least one question is required';
     if (!data.options || data.options.length === 0)
       return 'At least one option is required';
+    return null;
+  },
+  // Runtime validation of the respondent's answers. A row must be answered when
+  // it is individually marked `required`, or when the block-level `required`
+  // flag is set (which requires every row to be answered).
+  validateValue: (value, data) => {
+    const questions: MatrixQuestion[] = data.questions || [];
+    const responses: Record<string, string> = value || {};
+    const requireAll = Boolean(data.required);
+
+    const missing = questions.filter(
+      (question) => (requireAll || question.required) && !responses[question.id]
+    );
+
+    if (missing.length > 0) {
+      return (
+        data.requiredMessage ||
+        `Please answer: ${missing.map((question) => question.text).join(', ')}`
+      );
+    }
     return null;
   },
   // Input schema - signals to the AI handler that it should treat the block as a multi-step collection flow, asking about each row individually

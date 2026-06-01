@@ -129,6 +129,10 @@ export {
   unregisterBlock,
 } from './blocks';
 
+// Field name helpers (value-block field name support)
+export { generateFieldName, sanitizeFieldName } from './blocks/utils/GenFieldName';
+export { FieldNameField, useFieldName, resolveFieldConfig } from './builder/common/FieldNameField';
+
 // --------------------------------------------------------------------------
 // Types - Export specific types needed for rendering (not export *)
 // --------------------------------------------------------------------------
@@ -142,6 +146,7 @@ export type {
 
   // Block types
   BlockDefinition,
+  FieldNameConfig,
   BlockData,
   BlockRendererProps,
   ContentBlockItemProps,

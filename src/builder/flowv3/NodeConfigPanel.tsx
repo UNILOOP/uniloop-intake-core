@@ -10,6 +10,7 @@ import { Settings } from "lucide-react";
 import { NavigationRulesEditor } from "../common/NavigationRulesEditor";
 import { ValidationRulesEditor } from "../common/ValidationRulesEditor";
 import { CommonBlockRules } from "../common/CommonBlockRules";
+import { FieldNameField, resolveFieldConfig } from "../common/FieldNameField";
 import { ABTestEditor } from "../common/ABTestEditor";
 
 interface NodeConfigPanelProps {
@@ -166,6 +167,12 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
           {definition && definition.renderFormFields && (
             <div>
               <Label className="text-sm font-medium mb-2 block">Block Configuration</Label>
+              {(() => {
+                const fieldConfig = resolveFieldConfig(definition.fieldConfig);
+                return fieldConfig ? (
+                  <FieldNameField data={blockData} onUpdate={handleBlockUpdate} config={fieldConfig} />
+                ) : null;
+              })()}
               {definition.renderFormFields({
                 data: blockData,
                 onUpdate: handleBlockUpdate,

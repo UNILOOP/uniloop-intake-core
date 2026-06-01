@@ -92,21 +92,6 @@ const DatePickerBlockForm: React.FC<ContentBlockItemProps> = ({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-sm" htmlFor="fieldName">
-            Field Name
-          </Label>
-          <Input
-            id="fieldName"
-            value={data.fieldName || ''}
-            onChange={(e) => handleChange('fieldName', e.target.value)}
-            placeholder="dateField1"
-          />
-          <p className="text-xs text-muted-foreground">
-            Unique identifier for storing responses
-          </p>
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-sm" htmlFor="label">
             Question Label
           </Label>
@@ -917,4 +902,9 @@ export const DatePickerBlock: BlockDefinition = {
   outputSchema: {
     type: 'date',
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

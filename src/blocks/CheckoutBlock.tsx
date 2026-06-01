@@ -47,20 +47,6 @@ const CheckoutBlockForm: React.FC<ContentBlockItemProps> = ({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-sm" htmlFor="fieldName">
-            Field Name
-          </Label>
-          <Input
-            id="fieldName"
-            value={data.fieldName || ''}
-            onChange={(e) => handleChange('fieldName', e.target.value)}
-            placeholder="checkout"
-          />
-          <p className="text-xs text-muted-foreground">
-            Unique identifier for storing checkout data
-          </p>
-        </div>
-        <div className="space-y-2">
           <Label className="text-sm" htmlFor="label">
             Label
           </Label>
@@ -1937,4 +1923,9 @@ export const CheckoutBlock: BlockDefinition = {
       },
     },
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

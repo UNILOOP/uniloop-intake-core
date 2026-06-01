@@ -61,19 +61,6 @@ const CalculatedFieldForm: React.FC<ContentBlockItemProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-sm" htmlFor="fieldName">Field Name</Label>
-        <Input
-          id="fieldName"
-          value={data.fieldName || ""}
-          onChange={(e) => handleChange("fieldName", e.target.value)}
-          placeholder="calculatedResult"
-        />
-        <p className="text-xs text-muted-foreground">
-          The name of the field to store the calculated value
-        </p>
-      </div>
-
-      <div className="space-y-2">
         <Label className="text-sm" htmlFor="formula">Formula</Label>
         <Textarea
           id="formula"
@@ -554,4 +541,9 @@ return "Low Risk";`,
   outputSchema: {
     type: 'number'
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

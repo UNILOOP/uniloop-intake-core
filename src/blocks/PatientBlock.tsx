@@ -187,4 +187,9 @@ export const PatientBlock: BlockDefinition = {
       },
     },
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

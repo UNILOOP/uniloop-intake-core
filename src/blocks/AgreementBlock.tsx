@@ -52,21 +52,6 @@ const AgreementBlockForm: React.FC<ContentBlockItemProps> = ({
     <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-sm" htmlFor="fieldName">
-            Field Name
-          </Label>
-          <Input
-            id="fieldName"
-            value={data.fieldName || ''}
-            onChange={(e) => handle('fieldName', e.target.value)}
-            placeholder="agreement1"
-          />
-          <p className="text-xs text-muted-foreground">
-            Unique identifier for storing responses
-          </p>
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-sm" htmlFor="label">
             Label
           </Label>
@@ -788,4 +773,9 @@ export const AgreementBlock: BlockDefinition = {
   },
   // Chat renderer for multi-step agreement flow
   chatRenderer: (props) => <AgreementChatRenderer {...props} />,
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

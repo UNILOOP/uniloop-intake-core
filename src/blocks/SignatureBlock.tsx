@@ -26,19 +26,6 @@ const SignatureBlockForm: React.FC<ContentBlockItemProps> = ({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-sm" htmlFor="fieldName">Field Name</Label>
-          <Input
-            id="fieldName"
-            value={data.fieldName || ""}
-            onChange={(e) => handleChange("fieldName", e.target.value)}
-            placeholder="signature1"
-          />
-          <p className="text-xs text-muted-foreground">
-            Unique identifier for storing signature
-          </p>
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-sm" htmlFor="label">Label</Label>
           <Input
             id="label"
@@ -451,4 +438,9 @@ export const SignatureBlock: BlockDefinition = {
   outputSchema: {
     type: 'string'
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

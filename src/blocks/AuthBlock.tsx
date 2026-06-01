@@ -589,25 +589,6 @@ const AuthBlockForm: React.FC<ContentBlockItemProps> = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Field Name */}
-                  <div className="space-y-2">
-                    <Label className="text-sm" htmlFor="fieldName">
-                      Field Name (for data storage)
-                    </Label>
-                    <Input
-                      id="fieldName"
-                      value={data.fieldName || 'authResults'}
-                      onChange={(e) =>
-                        handleChange('fieldName', e.target.value)
-                      }
-                      placeholder="authResults"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      This is where the authentication data will be stored in
-                      the form results
-                    </p>
-                  </div>
-
                   {/* Skip if Logged In Option */}
                   <Card className="p-4 border-blue-200">
                     <div className="flex items-center space-x-2 mb-3">
@@ -3047,4 +3028,9 @@ export const AuthBlock: BlockDefinition = {
   },
   // Chat renderer for chat layout
   chatRenderer: (props: ChatRendererProps) => <AuthChatRenderer {...props} />,
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

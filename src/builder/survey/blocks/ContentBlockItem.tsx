@@ -8,6 +8,7 @@ import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 import {CommonBlockRules} from "../../common/CommonBlockRules";
+import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
 import { PieChart } from "lucide-react";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
@@ -88,6 +89,12 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                   <div className="flex items-center gap-2">
                     <Label className="text-base font-semibold">Block Configuration</Label>
                   </div>
+                  {(() => {
+                    const fieldConfig = resolveFieldConfig(blockDefinition.fieldConfig);
+                    return fieldConfig ? (
+                      <FieldNameField data={data} onUpdate={onUpdate} config={fieldConfig} />
+                    ) : null;
+                  })()}
                   {blockDefinition.renderFormFields({
                     data,
                     onUpdate,

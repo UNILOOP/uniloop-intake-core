@@ -67,6 +67,28 @@ export type OutputSchemaUnion = {
 
 export type OutputSchema = OutputSchemaScalar | OutputSchemaArray | OutputSchemaObject | OutputSchemaUnion;
 
+/**
+ * Declares that a block captures a value (a "value block") and should have a
+ * sanitized "Field Name" input rendered for it automatically in the builder.
+ *
+ * Set on a {@link BlockDefinition} via `fieldConfig`. Pass `true` for sensible
+ * defaults, or an object to customise the input. When present, the builder
+ * injects the Field Name UI itself, so the block's own `renderFormFields` no
+ * longer needs to declare one (and shouldn't, to avoid a duplicate input).
+ */
+export interface FieldNameConfig {
+  /** Marks the block as a value block and enables the auto-injected Field Name UI. Defaults to true. */
+  enabled?: boolean;
+  /** Label for the auto-rendered input. Defaults to "Field Name". */
+  label?: string;
+  /** Placeholder shown in the input. Defaults to "question1". */
+  placeholder?: string;
+  /** Helper text under the input. Defaults to "Unique identifier for storing responses". */
+  description?: string;
+  /** Whether a field name is required. Defaults to true. */
+  required?: boolean;
+}
+
 export interface BlockDefinition {
   type: string;
   name: string;
@@ -74,6 +96,13 @@ export interface BlockDefinition {
   icon?: ReactNode;
   defaultData: BlockData;
   generateDefaultData?: () => BlockData;
+  /**
+   * Field value support. When truthy, the builder auto-injects a sanitized
+   * "Field Name" input for the block and treats it as a value block, so the
+   * block's own `renderFormFields` no longer needs to declare a field name.
+   * Pass `true` for defaults, or a {@link FieldNameConfig} to customise it.
+   */
+  fieldConfig?: boolean | FieldNameConfig;
   // Builder components
   renderItem?: (props: ContentBlockItemProps) => JSX.Element;
   renderFormFields?: (props: ContentBlockItemProps) => JSX.Element;

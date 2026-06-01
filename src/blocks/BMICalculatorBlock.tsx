@@ -54,19 +54,6 @@ const BMICalculatorForm: React.FC<ContentBlockItemProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label  className="text-sm" htmlFor="fieldName">Field Name</Label>
-        <Input
-          id="fieldName"
-          value={data.fieldName || ""}
-          onChange={(e) => handleChange("fieldName", e.target.value)}
-          placeholder="bmiResult"
-        />
-        <p className="text-xs text-muted-foreground">
-          The name of the field to store the BMI results
-        </p>
-      </div>
-
-      <div className="space-y-2">
         <Label  className="text-sm" htmlFor="defaultUnit">Default Unit System</Label>
         <Select value={data.defaultUnit || "metric"} onValueChange={(value: string | boolean) => handleChange("defaultUnit", value)}>
           <SelectTrigger>
@@ -1202,4 +1189,9 @@ export const BMICalculatorBlock: BlockDefinition = {
       unit: { type: 'string', description: 'Unit system used (metric or imperial)' }
     }
   },
+  fieldConfig: {
+    enabled: true,
+    label: "Field Name",
+    required: true
+  }
 };

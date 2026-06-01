@@ -375,19 +375,6 @@ export const PatientBlockForm: React.FC<ContentBlockItemProps> = ({ data, onUpda
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm" htmlFor="fieldName">Field Name (for data storage)</Label>
-                    <Input
-                      id="fieldName"
-                      value={data.fieldName || "authResults"}
-                      onChange={(e) => handleChange("fieldName", e.target.value)}
-                      placeholder="authResults"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      This is where the authentication data will be stored in the form results
-                    </p>
-                  </div>
-
                   <div className="flex items-center space-x-2 mb-3">
                     <Checkbox
                       id="showLabel"

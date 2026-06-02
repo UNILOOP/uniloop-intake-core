@@ -704,5 +704,5 @@ export const themes: Record<SurveyTheme, ThemeDefinition> = {
   corporate: corporateTheme,
   dark: darkTheme,
   hims: himsTheme,
-  custom: undefined,
+  custom: undefined as unknown as ThemeDefinition,
 };

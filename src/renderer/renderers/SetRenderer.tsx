@@ -90,7 +90,7 @@ export const SetRenderer: React.FC<BlockRendererProps> = ({
                 onBlur={onBlur}
                 error={childBlock.fieldName && error ? error[childBlock.fieldName as any] : undefined}
                 disabled={disabled}
-                theme={theme}
+                theme={theme ?? undefined}
                 customComponents={customComponents}
                 isVisible={isChildVisible}
               />

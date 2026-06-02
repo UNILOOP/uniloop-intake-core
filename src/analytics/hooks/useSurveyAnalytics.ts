@@ -163,7 +163,7 @@ export const useSurveyAnalytics = (options: SurveyAnalyticsOptions = {}) => {
     };
 
     // analytics.trackEvent(event);
-    analytics.trackPageView(`/survey/${toSlug(pageTitle)}/${toSlug(blockLabel)}`, pageTitle);
+    analytics.trackPageView(`/survey/${toSlug(pageTitle ?? '')}/${toSlug(blockLabel ?? '')}`, pageTitle);
 
     if (options.debug) {
       console.log('[SurveyAnalytics] Page viewed', event);

@@ -528,7 +528,14 @@ return "Low Risk";`,
   renderItem: (props) => <CalculatedFieldItem {...props} />,
   renderFormFields: (props) => <CalculatedFieldForm {...props} />,
   renderPreview: () => <CalculatedFieldPreview />,
-  renderBlock: (props: CalculatedFieldProps) => <CalculatedFieldRenderer {...props} />,
+  renderBlock: (props) => (
+    <CalculatedFieldRenderer
+      {...props}
+      formula={props.block.formula}
+      dependencies={props.block.dependencies || []}
+      format={props.block.format}
+    />
+  ),
   validate: (data) => {
     if (!data.label) return "Label is required";
     if (!data.fieldName) return "Field name is required";

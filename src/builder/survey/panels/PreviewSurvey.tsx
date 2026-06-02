@@ -16,7 +16,7 @@ export const PreviewSurvey: React.FC<PreviewSurveyProps> = ({ layout, logo = nul
     <div className="w-full min-w-screen min-h-screen">
       {state.rootNode ? (
         <SurveyForm
-          survey={state}
+          survey={{ ...state, rootNode: state.rootNode }}
           mode={state.mode}
           enableDebug={false}
           abTestPreviewMode={true}

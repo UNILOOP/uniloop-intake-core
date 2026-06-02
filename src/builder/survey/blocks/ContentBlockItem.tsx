@@ -95,7 +95,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                       <FieldNameField data={data} onUpdate={onUpdate} config={fieldConfig} />
                     ) : null;
                   })()}
-                  {blockDefinition.renderFormFields({
+                  {blockDefinition.renderFormFields?.({
                     data,
                     onUpdate,
                     onRemove: () => {
@@ -125,7 +125,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
       </CardHeader>
 
       <CardContent>
-        {blockDefinition.renderItem({
+        {blockDefinition.renderItem?.({
           data,
           onUpdate,
           onRemove,

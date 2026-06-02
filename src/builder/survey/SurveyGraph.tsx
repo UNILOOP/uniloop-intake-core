@@ -288,7 +288,7 @@ export const SurveyGraph: React.FC<SurveyGraphProps> = ({
       const isPageNode = node.type === "set";
       
       // Determine if this page/section has items with navigation rules
-      const itemsWithNavRules = [];
+      const itemsWithNavRules: any[] = [];
       if (node.items) {
         node.items.forEach((item: any) => {
           if (item.navigationRules && item.navigationRules.length > 0) {
@@ -408,7 +408,7 @@ export const SurveyGraph: React.FC<SurveyGraphProps> = ({
           let pageX = flowNode.x + flowNode.width + LAYOUT_CONFIG.NODE_SPACING_X;
           const pageY = flowNode.y;
           
-          node.items.forEach((item: any, index) => {
+          node.items.forEach((item: any, index: number) => {
             if (item.type === "set" && item.uuid && !visited.has(item.uuid)) {
               const itemDimensions = processNode(item, pageX, pageY, level + 1, level);
               pageX += LAYOUT_CONFIG.NODE_SPACING_X + nodeWidth;

@@ -163,7 +163,7 @@ export const PatientBlockForm: React.FC<ContentBlockItemProps> = ({ data, onUpda
       // Step 1: Send OTP (if using OTP)
       if (data.authMethod === 'otp') {
         results.push("📧 Step 1: Sending OTP...");
-        const otpBody = data.authField === 'email' 
+        const otpBody: Record<string, any> = data.authField === 'email'
           ? { email: testData.email }
           : { phone: testData.phone };
         
@@ -239,7 +239,7 @@ export const PatientBlockForm: React.FC<ContentBlockItemProps> = ({ data, onUpda
           // Extract and store the token
           if (patientData[tokenFieldName]) {
             authToken = patientData[tokenFieldName];
-            results.push(`🔑 Token received: ${authToken.substring(0, 20)}...`);
+            results.push(`🔑 Token received: ${String(authToken).substring(0, 20)}...`);
             results.push(`Token will be used for subsequent requests\n`);
           }
 

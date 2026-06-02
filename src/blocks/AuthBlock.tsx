@@ -412,7 +412,7 @@ const AuthBlockForm: React.FC<ContentBlockItemProps> = ({
               results.push(`Error: ${errorData}`);
             }
           } catch (error) {
-            results.push(`❌ Email OTP flow error: ${error.message}`);
+            results.push(`❌ Email OTP flow error: ${(error as Error).message}`);
           }
         }
 
@@ -462,7 +462,7 @@ const AuthBlockForm: React.FC<ContentBlockItemProps> = ({
               results.push(`❌ Mobile OTP sending failed: ${otpRes.status}`);
             }
           } catch (error) {
-            results.push(`❌ Mobile OTP flow error: ${error.message}`);
+            results.push(`❌ Mobile OTP flow error: ${(error as Error).message}`);
           }
         }
       } else {
@@ -533,14 +533,14 @@ const AuthBlockForm: React.FC<ContentBlockItemProps> = ({
               results.push(`Error: ${errorData}`);
             }
           } catch (error) {
-            results.push(`❌ Direct login error: ${error.message}`);
+            results.push(`❌ Direct login error: ${(error as Error).message}`);
           }
         }
       }
 
       results.push('\n🎉 Flow testing completed!');
     } catch (error) {
-      results.push(`❌ Flow test error: ${error.message}`);
+      results.push(`❌ Flow test error: ${(error as Error).message}`);
     }
 
     setTestResults(results);
@@ -1731,7 +1731,7 @@ const AuthRenderer: React.FC<BlockRendererProps> = ({ block }) => {
     setIsManualNavigation(isBackNav);
 
     try {
-      const user = JSON.parse(localStorage.getItem(storageKey));
+      const user = JSON.parse(localStorage.getItem(storageKey) || 'null');
       if (user) {
         const existing = user[tokenField];
         if (existing) {

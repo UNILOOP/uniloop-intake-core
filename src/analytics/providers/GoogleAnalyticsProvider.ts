@@ -115,7 +115,7 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
         if (this.debug) {
           setTimeout(() => {
             // Send test event after a small delay to ensure GA is ready
-            window.gtag('event', 'analytics_initialized', {
+            window.gtag?.('event', 'analytics_initialized', {
               measurement_id: this.measurementId,
               debug_mode: true,
               timestamp: Date.now()
@@ -228,9 +228,10 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
       }
       
       // Include all other metadata
-      Object.keys(event.metadata).forEach(key => {
+      const metadata = event.metadata;
+      Object.keys(metadata).forEach(key => {
         if (!eventData.hasOwnProperty(key)) {
-          eventData[key] = event.metadata[key];
+          eventData[key] = metadata[key];
         }
       });
     }

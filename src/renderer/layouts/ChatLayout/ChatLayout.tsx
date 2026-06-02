@@ -616,7 +616,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
 
       // Let goToNextBlock handle navigation and submission
       // It evaluates navigation rules and submits when appropriate
-      goToNextBlock({ [currentBlock.fieldName]: value });
+      goToNextBlock({ [currentBlock.fieldName as string]: value });
 
       // Reset processing flag after navigation completes
       setTimeout(() => {

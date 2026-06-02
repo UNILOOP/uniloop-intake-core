@@ -605,7 +605,7 @@ const BMICalculatorRenderer: React.FC<BMICalculatorRendererProps> = ({
     const base = `w-full max-w-2xl border-0 shadow-none ${block.className || ''}`;
     const blockTheme = block.theme;
     
-    switch (blockTheme.name) {
+    switch (blockTheme?.name) {
       case "minimal":
         return `${base} shadow-none bg-transparent`;
       case "colorful":

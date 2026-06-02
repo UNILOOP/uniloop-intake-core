@@ -112,7 +112,7 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
         };
 
         // Remove undefined values
-        Object.keys(enrichedData).forEach((key) => enrichedData[key] === undefined && delete enrichedData[key]);
+        Object.keys(enrichedData).forEach((key) => (enrichedData as Record<string, any>)[key] === undefined && delete (enrichedData as Record<string, any>)[key]);
 
         window.dataLayer.push(enrichedData);
 

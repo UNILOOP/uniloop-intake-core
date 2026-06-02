@@ -34,7 +34,7 @@ export const BlockLibrary: React.FC = () => {
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 <div className="border rounded-md p-2 bg-muted/50">
-                  {definition.renderPreview()}
+                  {definition.renderPreview?.()}
                 </div>
               </CardContent>
             </Card>

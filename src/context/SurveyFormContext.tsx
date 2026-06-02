@@ -20,7 +20,7 @@ import {
   getNextPageFromNavigationRules,
   getNextStepFromNavigationRules
 } from "../utils/conditionalUtils";
-import { ThemeDefinition } from "../themes";
+import { ThemeDefinition, themes } from "../themes";
 import { getBlockDefinition } from "../blocks";
 
 // Navigation history entry - uses UUIDs for stable references across conditional navigation
@@ -64,7 +64,7 @@ export const SurveyFormContext = createContext<EnhancedSurveyFormContextProps>({
   submit: () => {},
   language: "en",
   setLanguage: () => {},
-  theme: null,
+  theme: themes.default,
   surveyData: { rootNode: { type: "" } },
   conditionalErrors: {},
   computedValues: {},
@@ -1023,7 +1023,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         submit,
         language: currentLanguage,
         setLanguage: setCurrentLanguage,
-        theme,
+        theme: theme ?? themes.default,
         surveyData,
         conditionalErrors,
         computedValues,

@@ -1038,8 +1038,12 @@ return age >= 18;`,
   renderItem: (props) => <ConditionalBlockItem {...props} />,
   renderFormFields: (props) => <ConditionalBlockForm {...props} />,
   renderPreview: () => <ConditionalBlockPreview />,
-  renderBlock: (props: ConditionalBlockProps) => (
-    <ConditionalBlockRenderer {...props} />
+  renderBlock: (props) => (
+    <ConditionalBlockRenderer
+      {...props}
+      condition={props.block.condition}
+      contextData={props.block.contextData}
+    />
   ),
   validate: (data) => {
     if (!data.condition) return 'Condition is required';

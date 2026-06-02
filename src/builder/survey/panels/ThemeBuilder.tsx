@@ -1976,7 +1976,7 @@ export const ThemeBuilder: React.FC<ThemeBuilderProps> = ({onDataChange, customT
                             </div>
                           ) : (
                             <VisualStyleBuilder
-                              value={currentTheme.field[key as keyof typeof currentTheme.field]}
+                              value={currentTheme.field[key as keyof typeof currentTheme.field] ?? ''}
                               onChange={(val) => updateNestedProperty('field', key, val)}
                               presetType={presetKey as keyof typeof FIELD_PRESETS}
                             />

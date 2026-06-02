@@ -722,7 +722,7 @@ const SelectableBoxRenderer: React.FC<SelectableBoxRendererProps> = ({
     if (shouldAutoSubmit) {
       if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
       autoSubmitTimerRef.current = setTimeout(() => {
-        goToNextBlock({ [block.fieldName]: newValues });
+        goToNextBlock({ [block.fieldName as string]: newValues });
       }, 150);
     }
   };

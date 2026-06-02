@@ -112,7 +112,7 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ theme, state, layout, logo 
           <div className="survey-preview-content transition-all duration-300 w-full">
             {state.rootNode ? (
               <SurveyForm
-                survey={{...state, theme}}
+                survey={{ ...state, theme, rootNode: state.rootNode }}
                 mode={state.mode}
                 enableDebug={false}
                 abTestPreviewMode={true}

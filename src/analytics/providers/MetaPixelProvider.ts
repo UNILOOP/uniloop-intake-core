@@ -241,7 +241,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
         };
 
         // Remove undefined values
-        Object.keys(timingData).forEach((key) => timingData[key] === undefined && delete timingData[key]);
+        Object.keys(timingData).forEach((key) => (timingData as Record<string, any>)[key] === undefined && delete (timingData as Record<string, any>)[key]);
 
         window.fbq('trackCustom', 'SurveyTiming', timingData);
 

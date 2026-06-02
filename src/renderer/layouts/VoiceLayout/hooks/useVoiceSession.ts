@@ -553,7 +553,7 @@ export function useVoiceSession(
           // Audio was stopped externally
           completePlayback();
         },
-        onloaderror: (_id, error) => {
+        onloaderror: (_id: number, error: unknown) => {
           if (hasCompleted) return;
           hasCompleted = true;
           cleanup();
@@ -563,7 +563,7 @@ export function useVoiceSession(
           dispatch({ type: 'STOP_SPEAKING' });
           reject(new Error('Audio load failed'));
         },
-        onplayerror: (_id, error) => {
+        onplayerror: (_id: number, error: unknown) => {
           if (hasCompleted) return;
           hasCompleted = true;
           cleanup();
@@ -898,7 +898,9 @@ export function useVoiceSession(
             voice: handlers.ttsVoice,
             rate: 1.0,
           });
-          await playAudioFromTTS(response.audio, response.format, response.sampleRate);
+          if (response.audio) {
+            await playAudioFromTTS(response.audio, response.format || 'mp3', response.sampleRate);
+          }
         } catch (error) {
           console.error('Custom TTS error:', error);
           dispatch({ type: 'STOP_SPEAKING' });

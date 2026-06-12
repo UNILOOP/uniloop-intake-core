@@ -19,7 +19,7 @@ import {
   type OnSelectionChangeFunc,
   type OnReconnect,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import './flowV3.css';
 import { v4 as uuidv4 } from "uuid";
 
 import { useSurveyBuilder } from "../../context/SurveyBuilderContext";

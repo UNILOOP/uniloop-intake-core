@@ -1,4 +1,5 @@
 import type { NodeData, BlockData, SurveyMode } from "../types";
+import { isDefaultLanguageCode } from "./languages";
 
 /**
  * Detects the survey mode based on the structure of rootNode
@@ -243,7 +244,7 @@ export function getLocalized(
   language: string,
   localizations?: Record<string, Record<string, string>>
 ) {
-  if (!localizations || !language || language === 'en') {
+  if (!localizations || !language || isDefaultLanguageCode(language)) {
     return block[field];
   }
 
@@ -252,13 +253,88 @@ export function getLocalized(
     return block[field];
   }
 
+  const originalValue = block[field];
+  if (typeof originalValue === 'string' && langMap[originalValue] !== undefined) {
+    return langMap[originalValue] || originalValue;
+  }
+
   const blockId = block.uuid;
   if (!blockId) {
-    return block[field];
+    return originalValue;
   }
 
   const key = `${blockId}.${field}`;
-  return langMap[key] || block[field];
+  return langMap[key] || originalValue;
+}
+
+const LOCALIZABLE_FIELDS = ['name', 'label', 'description', 'text', 'html', 'placeholder'] as const;
+
+function localizeText(
+  value: unknown,
+  language: string,
+  localizations?: Record<string, Record<string, string>>
+): unknown {
+  if (typeof value !== 'string' || !localizations || !language || isDefaultLanguageCode(language)) {
+    return value;
+  }
+
+  const langMap = localizations[language];
+
+  return langMap?.[value] || value;
+}
+
+/**
+ * Applies text-key localization to a block before rendering.
+ *
+ * The builder stores localizations by source text, while older package exports
+ * may use UUID.field keys. This supports both formats without changing saved
+ * survey JSON.
+ */
+export function localizeBlockForRendering(
+  block: BlockData,
+  language: string,
+  localizations?: Record<string, Record<string, string>>
+): BlockData {
+  if (!localizations || !language || isDefaultLanguageCode(language)) {
+    return block;
+  }
+
+  const localizedBlock: BlockData = { ...block };
+
+  for (const field of LOCALIZABLE_FIELDS) {
+    localizedBlock[field] = getLocalized(block, field, language, localizations);
+  }
+
+  if (Array.isArray(block.options)) {
+    localizedBlock.options = block.options.map((option: any) => ({
+      ...option,
+      label: localizeText(option.label, language, localizations),
+      text: localizeText(option.text, language, localizations),
+    }));
+  }
+
+  if (Array.isArray(block.labels)) {
+    localizedBlock.labels = block.labels.map((label: string) =>
+      localizeText(label, language, localizations) as string
+    );
+  }
+
+  if (Array.isArray(block.validationRules)) {
+    localizedBlock.validationRules = block.validationRules.map((rule: any) => ({
+      ...rule,
+      message: localizeText(rule.message, language, localizations),
+    }));
+  }
+
+  if (block.childBlock && typeof block.childBlock === 'object') {
+    localizedBlock.childBlock = localizeBlockForRendering(
+      block.childBlock as BlockData,
+      language,
+      localizations
+    );
+  }
+
+  return localizedBlock;
 }
 
 /**

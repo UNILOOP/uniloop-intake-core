@@ -22,6 +22,7 @@ import {
 } from "../utils/conditionalUtils";
 import { ThemeDefinition, themes } from "../themes";
 import { getBlockDefinition } from "../blocks";
+import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
 // Navigation history entry - uses UUIDs for stable references across conditional navigation
 interface NavigationHistoryEntry {
@@ -62,7 +63,7 @@ export const SurveyFormContext = createContext<EnhancedSurveyFormContextProps>({
   isSubmitting: false,
   isValid: true,
   submit: () => {},
-  language: "en",
+  language: DEFAULT_LANGUAGE_CODE,
   setLanguage: () => {},
   theme: themes.default,
   surveyData: { rootNode: { type: "" } },
@@ -130,7 +131,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   onChange,
   onPageChange,
   onNavigationHistoryChange,
-  language = "en",
+  language = DEFAULT_LANGUAGE_CODE,
   theme,
   computedFields = {},
   customValidators = {},
@@ -190,6 +191,10 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(language);
+
+  useEffect(() => {
+    setCurrentLanguage(language);
+  }, [language]);
 
   // Navigation history state - use provided history or build complete path to startPage
   const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryEntry[]>(() => {

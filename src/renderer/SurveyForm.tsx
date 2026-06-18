@@ -7,6 +7,17 @@ import { applyDynamicColors } from '../utils/colorUtils';
 import { useFontLoader, getFontCSSProperties } from '../utils/fontLoader';
 import { SurveyAnalyticsProvider } from '../analytics';
 import type { AnalyticsConfig } from '../analytics';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  getBestLanguageCodeForLocalizations,
+  getLanguageOptionsForLocalizations,
+} from '../utils/languages';
 
 // Import the theme isolation CSS
 import '../styles/survey-theme-isolation.css';
@@ -21,7 +32,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   initialValues,
   startPage = 0,
   initialNavigationHistory,
-  language = 'en',
+  language,
   progressBar = true,
   navigationButtons = {
     showPrevious: true,
@@ -52,6 +63,42 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   const renderCountRef = React.useRef(0);
   const mountIdRef = React.useRef(Math.random().toString(36).substr(2, 9));
   renderCountRef.current += 1;
+  const languageOptions = React.useMemo(
+    () => getLanguageOptionsForLocalizations(survey?.localizations),
+    [survey?.localizations]
+  );
+  const browserLanguages = React.useMemo(() => {
+    if (typeof navigator === 'undefined') {
+      return [];
+    }
+
+    return navigator.languages?.length
+      ? [...navigator.languages]
+      : navigator.language
+        ? [navigator.language]
+        : [];
+  }, []);
+  const hasLanguageOverride = typeof language === 'string' && language.trim().length > 0;
+  const preferredLanguage = React.useMemo(
+    () => getBestLanguageCodeForLocalizations(
+      survey?.localizations,
+      hasLanguageOverride ? [language] : browserLanguages
+    ),
+    [browserLanguages, hasLanguageOverride, language, survey?.localizations]
+  );
+  const [selectedLanguage, setSelectedLanguage] = React.useState(preferredLanguage);
+  const showLanguageSwitcher = languageOptions.length > 1;
+
+  React.useEffect(() => {
+    if (hasLanguageOverride) {
+      setSelectedLanguage(preferredLanguage);
+      return;
+    }
+
+    if (!languageOptions.some((option) => option.code === selectedLanguage)) {
+      setSelectedLanguage(preferredLanguage);
+    }
+  }, [hasLanguageOverride, languageOptions, preferredLanguage, selectedLanguage]);
 
   // Track mount/unmount
   React.useEffect(() => {
@@ -281,6 +328,25 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       className={`relative survey-theme-container ${themeClass} flex-1 min-h-screen flex flex-col`}
       style={surveyThemeStyle}
     >
+      {showLanguageSwitcher && (
+        <div className="fixed right-3 bottom-3 z-50">
+          <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <SelectTrigger
+              aria-label="Language"
+              className="h-8 w-fit rounded-full border border-black/10 bg-white/95 px-3 text-xs shadow-sm backdrop-blur"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {languageOptions.map((option) => (
+                <SelectItem key={option.code} value={option.code}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="survey-isolated-content flex-1 flex flex-col min-h-screen">
         <div
           className={`${containerClass} ${themeConfig.background} flex flex-col flex-1 min-h-screen`}
@@ -296,7 +362,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             onPageChange={onPageChange}
             onNavigationHistoryChange={onNavigationHistoryChange}
             enableDebug={enableDebug}
-            language={language}
+            language={selectedLanguage}
             theme={themeConfig}
             logo={logo}
             abTestPreviewMode={abTestPreviewMode}

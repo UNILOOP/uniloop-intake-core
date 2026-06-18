@@ -9,6 +9,7 @@ import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { NodeData, BlockData } from "../../../types";
 import { ensureNodeUuids } from "../../../utils/nodeUtils";
 import { detectSurveyMode } from "../../../utils/surveyUtils";
+import { DEFAULT_LANGUAGE_CODE } from "../../../utils/languages";
 
 /**
  * Converts a paged survey structure to pageless by extracting all blocks from pages
@@ -129,7 +130,7 @@ export const JsonEditor: React.FC = () => {
 
       importSurvey({
         rootNode: rootNodeWithUuids,
-        localizations: data.localizations || { en: {} },
+        localizations: data.localizations || { [DEFAULT_LANGUAGE_CODE]: {} },
         theme: data.theme || null
       });
 
@@ -174,7 +175,7 @@ export const JsonEditor: React.FC = () => {
                 onChange={(e) => setImportJson(e.target.value)}
                 placeholder='{
   "rootNode": { "type": "section", ... },
-  "localizations": { "en": { ... } }
+  "localizations": { "en-US": { ... } }
 }'
                 rows={12}
                 className="font-mono text-sm"

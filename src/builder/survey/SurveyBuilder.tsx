@@ -43,6 +43,7 @@ interface SurveyBuilderProps {
 export interface SurveyBuilderHandle {
   updateTheme: (theme: ThemeDefinition) => void;
   getTheme: () => ThemeDefinition;
+  exportSurvey: () => { rootNode: NodeData | null; localizations: LocalizationMap; theme: ThemeDefinition };
   importSurvey: (data: { rootNode: NodeData; localizations?: LocalizationMap; theme?: ThemeDefinition }) => void;
 }
 
@@ -109,10 +110,11 @@ const SurveyBuilderContent = forwardRef<SurveyBuilderHandle, Omit<SurveyBuilderP
       updateTheme(theme);
     },
     getTheme: () => state.theme,
+    exportSurvey: () => exportSurvey(),
     importSurvey: (data: { rootNode: NodeData; localizations?: LocalizationMap; theme?: ThemeDefinition }) => {
       importSurvey(data);
     },
-  }), [updateTheme, state.theme, importSurvey]);
+  }), [updateTheme, state.theme, importSurvey, exportSurvey]);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isThemeBuilderOpen, setIsThemeBuilderOpen] = useState(false);
   const [isFlowBuilderOpen, setIsFlowBuilderOpen] = useState(false);
@@ -156,7 +158,7 @@ const SurveyBuilderContent = forwardRef<SurveyBuilderHandle, Omit<SurveyBuilderP
   // 4. Notify parent only on real data changes
   React.useEffect(() => {
     onDataChange?.(exportSurvey());
-  }, [state.rootNode, state.localizations, onDataChange]);
+  }, [state.rootNode, state.localizations, state.theme, onDataChange]);
 
   // Create root node if none exists
   const handleCreateRootNode = React.useCallback(() => {

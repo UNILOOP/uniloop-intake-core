@@ -5,18 +5,21 @@ import { validateBlock } from '../../utils/blockAdapter';
 import { useSurveyForm } from '../../context/SurveyFormContext';
 import { getBlockDataForRendering } from '../../utils/abTestUtils';
 import { ABTestIndicator } from '../../components/ui/ABTestIndicator';
+import { localizeBlockForRendering } from '../../utils/surveyUtils';
 
 /**
  * A component that renders different types of blocks based on their type
  */
 export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props, _ref) => {
   const { block, value, onChange, onBlur, error, disabled, customComponents, theme = null, isVisible } = props;
-  const { analytics, enableDebug, abTestPreviewMode } = useSurveyForm();
+  const { analytics, enableDebug, abTestPreviewMode, language, surveyData } = useSurveyForm();
 
   // Apply A/B testing variant selection if enabled
   const blockToRender = useMemo(() => {
-    return getBlockDataForRendering(block, analytics?.sessionId, enableDebug, abTestPreviewMode);
-  }, [block, analytics?.sessionId, enableDebug, abTestPreviewMode]);
+    const selectedBlock = getBlockDataForRendering(block, analytics?.sessionId, enableDebug, abTestPreviewMode);
+
+    return localizeBlockForRendering(selectedBlock, language, surveyData.localizations);
+  }, [block, analytics?.sessionId, enableDebug, abTestPreviewMode, language, surveyData.localizations]);
 
   // If the block has a visibility condition and is explicitly not visible, don't render it
   if (isVisible === false) {

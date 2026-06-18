@@ -15,6 +15,7 @@ import {
 } from "../types";
 import { uniloop as uniTheme } from "../themes";
 import { getOutputKeys, isObjectOutput } from "../utils/outputSchema";
+import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
 // Custom hook
 export const useSurveyBuilder = () => {
@@ -33,7 +34,7 @@ const initialState: SurveyBuilderState = {
     nodes: {},
   },
   localizations: {
-    en: {},
+    [DEFAULT_LANGUAGE_CODE]: {},
   },
   theme: uniTheme,
   selectedNode: null,
@@ -81,7 +82,7 @@ const surveyBuilderReducer = (
       return {
         ...state,
         rootNode: ensureRootNodeDefaults(action.payload.rootNode || null),
-        localizations: action.payload.localizations || { en: {} },
+        localizations: action.payload.localizations || { [DEFAULT_LANGUAGE_CODE]: {} },
         theme: action.payload.theme || uniTheme,
       };
     case ActionTypes.SET_ROOT_NODE:
@@ -326,7 +327,7 @@ const surveyBuilderReducer = (
       return {
         ...state,
         rootNode: ensureRootNodeDefaults(action.payload.rootNode || null),
-        localizations: action.payload.localizations || { en: {} },
+        localizations: action.payload.localizations || { [DEFAULT_LANGUAGE_CODE]: {} },
         theme: action.payload.theme || uniTheme,
       };
 
@@ -416,7 +417,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     {
       ...initialState,
       rootNode: ensureRootNodeDefaults(initialData?.rootNode || null),
-      localizations: initialData?.localizations || { en: {} },
+      localizations: initialData?.localizations || { [DEFAULT_LANGUAGE_CODE]: {} },
       theme: initialData?.theme || uniTheme,
       enableDebug,
       customData,
@@ -470,7 +471,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     const data = {
       rootNode,
       localizations: {
-        en: {}
+        [DEFAULT_LANGUAGE_CODE]: {}
       },
       theme: uniTheme
     };

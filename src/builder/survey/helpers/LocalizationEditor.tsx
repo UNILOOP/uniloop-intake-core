@@ -5,13 +5,29 @@ import { Input } from "../../../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Label } from "../../../components/ui/label";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 import { ClipboardCopy } from "lucide-react";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { LocalizationMap } from "../../../types";
+import {
+  canonicalLanguageCode,
+  COMMON_LANGUAGE_OPTIONS,
+  DEFAULT_LANGUAGE_CODE,
+  getLanguageLabel,
+  isDefaultLanguageCode,
+  LEGACY_DEFAULT_LANGUAGE_CODE,
+  normalizeLanguageCode,
+} from "../../../utils/languages";
 
 export const LocalizationEditor: React.FC = () => {
   const { state, updateLocalizations } = useSurveyBuilder();
-  const [newLanguageCode, setNewLanguageCode] = useState("");
+  const [selectedLanguageCode, setSelectedLanguageCode] = useState("");
   const [labels, setLabels] = useState<string[]>([]);
   const [localizations, setLocalizations] = useState<LocalizationMap>({});
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
@@ -34,7 +50,11 @@ export const LocalizationEditor: React.FC = () => {
 
   // Update English labels
   const updateEnglishLabels = (extractedLabels: string[]) => {
-    const englishLabels = { ...(localizations.en || {}) };
+    const currentLocalizations = state.localizations || { [DEFAULT_LANGUAGE_CODE]: {} };
+    const defaultLanguageKey = currentLocalizations[DEFAULT_LANGUAGE_CODE]
+      ? DEFAULT_LANGUAGE_CODE
+      : LEGACY_DEFAULT_LANGUAGE_CODE;
+    const englishLabels = { ...(currentLocalizations[defaultLanguageKey] || {}) };
 
     let updated = false;
     for (const label of extractedLabels) {
@@ -45,10 +65,12 @@ export const LocalizationEditor: React.FC = () => {
     }
 
     if (updated) {
-      const updatedLocalizations = {
-        ...localizations,
-        en: englishLabels,
+      const updatedLocalizations: LocalizationMap = {
+        ...currentLocalizations,
+        [DEFAULT_LANGUAGE_CODE]: englishLabels,
       };
+      delete updatedLocalizations[LEGACY_DEFAULT_LANGUAGE_CODE];
+
       setLocalizations(updatedLocalizations);
       updateLocalizations(updatedLocalizations);
     }
@@ -56,8 +78,11 @@ export const LocalizationEditor: React.FC = () => {
 
   // Add a new language
   const handleAddLanguage = () => {
-    if (!newLanguageCode || newLanguageCode.trim() === "") return;
-    if (localizations[newLanguageCode]) return; // Language already exists
+    const languageCode = canonicalLanguageCode(selectedLanguageCode);
+
+    if (!languageCode || Object.keys(localizations).some((code) => (
+      normalizeLanguageCode(canonicalLanguageCode(code)) === normalizeLanguageCode(languageCode)
+    ))) return;
 
     const newLang: Record<string, string> = {};
 
@@ -68,17 +93,17 @@ export const LocalizationEditor: React.FC = () => {
 
     const updatedLocalizations = {
       ...localizations,
-      [newLanguageCode]: newLang,
+      [languageCode]: newLang,
     };
 
     setLocalizations(updatedLocalizations);
     updateLocalizations(updatedLocalizations);
-    setNewLanguageCode("");
+    setSelectedLanguageCode("");
   };
 
   // Remove a language
   const handleRemoveLanguage = (langCode: string) => {
-    if (langCode === "en") return; // Cannot remove English
+    if (isDefaultLanguageCode(langCode)) return; // Cannot remove English
 
     const { [langCode]: _, ...rest } = localizations;
     setLocalizations(rest);
@@ -135,14 +160,31 @@ export const LocalizationEditor: React.FC = () => {
       <div className="flex gap-4 items-end">
         <div className="space-y-2 flex-grow">
           <Label htmlFor="new-language">Add Language</Label>
-          <Input
-            id="new-language"
-            placeholder="Language code (e.g., fr, es-ES)"
-            value={newLanguageCode}
-            onChange={(e) => setNewLanguageCode(e.target.value)}
-          />
+          <Select
+            value={selectedLanguageCode}
+            onValueChange={setSelectedLanguageCode}
+          >
+            <SelectTrigger id="new-language">
+              <SelectValue placeholder="Select language" />
+            </SelectTrigger>
+            <SelectContent>
+              {COMMON_LANGUAGE_OPTIONS.filter((language) => !Object.keys(localizations).some((code) => (
+                normalizeLanguageCode(canonicalLanguageCode(code)) === normalizeLanguageCode(language.code)
+              ))).map((language) => (
+                <SelectItem key={language.code} value={language.code}>
+                  {language.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Button type="button" onClick={handleAddLanguage}>Add</Button>
+        <Button
+          type="button"
+          onClick={handleAddLanguage}
+          disabled={!selectedLanguageCode}
+        >
+          Add
+        </Button>
       </div>
 
       {labels.length === 0 && (
@@ -158,9 +200,9 @@ export const LocalizationEditor: React.FC = () => {
           <Card key={langCode}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg">
-                {langCode === "en" ? "English (Default)" : langCode}
+                {isDefaultLanguageCode(langCode) ? "English (United States) (Default)" : getLanguageLabel(langCode)}
               </CardTitle>
-              {langCode !== "en" && (
+              {!isDefaultLanguageCode(langCode) && (
                 <Button
                   type="button"
                   variant="outline"
@@ -176,19 +218,19 @@ export const LocalizationEditor: React.FC = () => {
                 {labels.map((label) => (
                   <div key={label} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col">
-                      <Label className="mb-2">{langCode === "en" ? "Original Text" : "English"}</Label>
+                      <Label className="mb-2">{isDefaultLanguageCode(langCode) ? "Original Text" : "English (United States)"}</Label>
                       <div className="p-2 bg-muted rounded-md text-sm">
-                        {langCode === "en" ? label : localizations.en[label] || label}
+                        {isDefaultLanguageCode(langCode) ? label : localizations[DEFAULT_LANGUAGE_CODE]?.[label] || localizations[LEGACY_DEFAULT_LANGUAGE_CODE]?.[label] || label}
                       </div>
                     </div>
                     <div className="flex flex-col">
-                      <Label className="mb-2">{langCode === "en" ? "English" : `${langCode} Translation`}</Label>
+                      <Label className="mb-2">{isDefaultLanguageCode(langCode) ? "English (United States)" : `${getLanguageLabel(langCode)} Translation`}</Label>
                       <Input
                         value={localizations[langCode][label] || ""}
                         onChange={(e) =>
                           handleUpdateTranslation(langCode, label, e.target.value)
                         }
-                        disabled={langCode === "en"}
+                        disabled={isDefaultLanguageCode(langCode)}
                       />
                     </div>
                   </div>

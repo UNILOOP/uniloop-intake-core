@@ -1,4 +1,5 @@
 import type { AnalyticsEventMappings, AnalyticsProvider, GTMDataLayerEvent, SurveyAnalyticsEvent } from '../types';
+import { buildMappedAnalyticsPayload } from '../mappingTransforms';
 
 export class GoogleTagManagerProvider implements AnalyticsProvider {
     name = 'GoogleTagManager';
@@ -159,17 +160,13 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
             });
         }
 
-        const fieldMap = mapping?.field_map;
-        // Union per-event drop_keys with channel-scoped global_drop_keys.google_tag_manager.
-        // The 'event' key is the dataLayer event name itself, so never droppable/renameable.
-        const dropSet = new Set<string>([...(mapping?.drop_keys ?? []), ...(this.eventMappings?.global_drop_keys?.google_tag_manager ?? [])]);
-        const gtmEvent: GTMDataLayerEvent = { event: rawEvent.event };
-        for (const [key, value] of Object.entries(rawEvent)) {
-            if (key === 'event' || dropSet.has(key)) continue;
-            gtmEvent[fieldMap?.[key] ?? key] = value;
-        }
-
-        Object.assign(gtmEvent, mapping?.extra_fields ?? {});
+        const gtmEvent = buildMappedAnalyticsPayload(
+            rawEvent,
+            mapping,
+            this.eventMappings?.global_drop_keys?.google_tag_manager ?? [],
+            this.eventMappings?.global_hash_keys?.google_tag_manager ?? [],
+            ['event'],
+        ) as GTMDataLayerEvent;
 
         this.pushToDataLayer(gtmEvent);
 

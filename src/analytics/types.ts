@@ -8,22 +8,26 @@
 export interface AnalyticsEventMappings {
     version?: number;
     global_drop_keys?: Record<string, string[]>;
+    global_hash_keys?: Record<string, string[]>;
     events?: Record<
         string,
-        Record<
-            string,
-            { enabled?: boolean; name?: string; field_map?: Record<string, string>; drop_keys?: string[]; extra_fields?: Record<string, unknown> }
-        >
+        Record<string, AnalyticsChannelMapping>
     >;
     custom_events?: Array<{
         key: string;
         trigger_event: string;
         condition?: { path?: string; op?: string; value?: unknown } | null;
-        channels: Record<
-            string,
-            { enabled?: boolean; name?: string; field_map?: Record<string, string>; drop_keys?: string[]; extra_fields?: Record<string, unknown> }
-        >;
+        channels: Record<string, AnalyticsChannelMapping>;
     }>;
+}
+
+export interface AnalyticsChannelMapping {
+    enabled?: boolean;
+    name?: string;
+    field_map?: Record<string, string>;
+    drop_keys?: string[];
+    hash_keys?: string[];
+    extra_fields?: Record<string, unknown>;
 }
 
 export interface AnalyticsConfig {

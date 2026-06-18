@@ -1,4 +1,5 @@
 import type { AnalyticsEventMappings, AnalyticsProvider, SurveyAnalyticsEvent } from '../types';
+import { buildMappedAnalyticsPayload } from '../mappingTransforms';
 
 export class MetaPixelProvider implements AnalyticsProvider {
     name = 'MetaPixel';
@@ -180,17 +181,14 @@ export class MetaPixelProvider implements AnalyticsProvider {
             else if (!['survey_start', 'page_view'].includes(event.action)) rawData.content_name = event.action;
         }
 
-        const fieldMap = mapping?.field_map ?? {};
-        // Union per-event drop_keys with the channel-scoped global_drop_keys.meta —
-        // mirrors EventMappingResolver::withGlobalDrops() on the server.
-        const dropSet = new Set<string>([...(mapping?.drop_keys ?? []), ...(this.eventMappings?.global_drop_keys?.meta ?? [])]);
-        const customData: Record<string, any> = {};
-        for (const [key, value] of Object.entries(rawData)) {
-            if (value === undefined || dropSet.has(key)) continue;
-            customData[fieldMap[key] ?? key] = value;
-        }
+        Object.keys(rawData).forEach((key) => rawData[key] === undefined && delete rawData[key]);
 
-        Object.assign(customData, mapping?.extra_fields ?? {});
+        const customData = buildMappedAnalyticsPayload(
+            rawData,
+            mapping,
+            this.eventMappings?.global_drop_keys?.meta ?? [],
+            this.eventMappings?.global_hash_keys?.meta ?? [],
+        );
 
         return { eventName, customData };
     }

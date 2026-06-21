@@ -297,6 +297,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       meta: analytics.meta
         ? { ...analytics.meta, eventMappings: analytics.meta.eventMappings ?? mappings }
         : undefined,
+      customPixels: analytics.customPixels
+        ? { ...analytics.customPixels, eventMappings: analytics.customPixels.eventMappings ?? mappings }
+        : undefined,
       trackEvent: analytics.trackEvent,
       trackPageView: analytics.trackPageView,
       trackTiming: analytics.trackTiming,
@@ -311,6 +314,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       (analytics?.googleAnalytics ||
         analytics?.googleTagManager ||
         analytics?.meta ||
+        (analytics?.customPixels?.pixels && analytics.customPixels.pixels.length > 0) ||
         analytics?.trackEvent),
     [analytics]
   );

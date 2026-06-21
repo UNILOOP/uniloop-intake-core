@@ -390,6 +390,17 @@ export interface SurveyFormRendererProps {
       debug?: boolean;
       eventMappings?: import('./analytics/types').AnalyticsEventMappings;
     };
+    /**
+     * Merchant-configured custom browser pixels (TikTok, Snapchat, …). Each
+     * instance's `key` is the dynamic channel key `pixel:{id}`; firing is gated
+     * on that channel's mapping (DEFAULT-DISABLED). Mirrors the host app's
+     * AnalyticsService::getFrontendConfig() `pixels` array.
+     */
+    customPixels?: {
+      pixels: import('./analytics/types').CustomPixelInstance[];
+      debug?: boolean;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
+    };
     trackEvent?: (event: any) => void;
     trackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;
     trackTiming?: (category: string, variable: string, value: number, label?: string) => void;

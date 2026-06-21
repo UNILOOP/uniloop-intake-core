@@ -30,6 +30,18 @@ export interface AnalyticsChannelMapping {
     extra_fields?: Record<string, unknown>;
 }
 
+/**
+ * A single merchant-configured custom browser pixel instance. Same shape the
+ * host app ships from AnalyticsService::getFrontendConfig()'s `pixels` array:
+ * `key` is the dynamic channel key `pixel:{id}`, `vendor` is one of the vetted
+ * vendor keys (tiktok, snapchat, …), and `pixel_id` is the merchant's pixel ID.
+ */
+export interface CustomPixelInstance {
+    key: string;
+    vendor: string | null;
+    pixel_id: string | null;
+}
+
 export interface AnalyticsConfig {
     // Session identifier for tracking
     sessionId?: string;
@@ -61,6 +73,17 @@ export interface AnalyticsConfig {
         pixelId: string;
         accessToken?: string; // For Conversion API
         testEventCode?: string; // For testing events
+        debug?: boolean;
+        eventMappings?: AnalyticsEventMappings;
+    };
+    /**
+     * Merchant-configured custom browser pixels (TikTok, Snapchat, …). Each
+     * instance's `key` is the dynamic channel key `pixel:{id}` used by the
+     * backend resolver; firing is gated on that channel's mapping, which is
+     * DEFAULT-DISABLED. Mirrors the host app's AnalyticsService pixels array.
+     */
+    customPixels?: {
+        pixels: CustomPixelInstance[];
         debug?: boolean;
         eventMappings?: AnalyticsEventMappings;
     };

@@ -5,3 +5,4 @@ export { useSurveyAnalytics } from './hooks/useSurveyAnalytics';
 export { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
 export { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 export { MetaPixelProvider } from './providers/MetaPixelProvider';
+export { CustomPixelProvider } from './providers/CustomPixelProvider';

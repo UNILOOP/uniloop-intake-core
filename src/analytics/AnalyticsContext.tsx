@@ -8,6 +8,7 @@ import type {
 import { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
 import { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 import { MetaPixelProvider } from './providers/MetaPixelProvider';
+import { CustomPixelProvider } from './providers/CustomPixelProvider';
 // import './utils/debugHelpers'; // Import debug helpers to make them available
 
 const AnalyticsContext = createContext<AnalyticsContextValue | undefined>(undefined);
@@ -102,6 +103,24 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           activeProviders.push(metaProvider);
           if (debug) {
             console.log('[Analytics] Meta Pixel initialized successfully');
+          }
+        }
+
+        // Initialize custom browser pixels (TikTok, Snapchat, …)
+        if (config.customPixels?.pixels && config.customPixels.pixels.length > 0) {
+          if (debug) {
+            console.log('[Analytics] Initializing Custom Pixels:', config.customPixels.pixels);
+          }
+          const customPixelProvider = new CustomPixelProvider();
+          await customPixelProvider.initialize({
+            ...config.customPixels,
+            debug: debug || config.customPixels.debug,
+            sessionId: config.sessionId,
+            userId: config.userId
+          });
+          activeProviders.push(customPixelProvider);
+          if (debug) {
+            console.log('[Analytics] Custom Pixels initialized successfully');
           }
         }
 

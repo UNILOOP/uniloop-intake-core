@@ -1,4 +1,5 @@
 import type { AnalyticsChannelMapping } from './types';
+import { formatFieldValue, normalizeFieldMap } from './fieldFormats';
 
 function rightRotate(value: number, amount: number): number {
     return (value >>> amount) | (value << (32 - amount));
@@ -78,7 +79,10 @@ export function buildMappedAnalyticsPayload(
     globalHashes: string[] = [],
     protectedKeys: string[] = [],
 ): Record<string, unknown> {
-    const fieldMap = mapping?.field_map ?? {};
+    // Entries carry the output key plus an optional value format; the
+    // data-layer level is applied by the caller (see splitRootLevelKeys), since
+    // only the caller knows whether its envelope nests the payload.
+    const entries = normalizeFieldMap(mapping?.field_map);
     const out = clonePayload(payload);
     const protectedSet = new Set(protectedKeys);
     const dropSet = new Set<string>([...(mapping?.drop_keys ?? []), ...globalDrops]);
@@ -89,8 +93,8 @@ export function buildMappedAnalyticsPayload(
         }
     }
 
-    for (const [sourceKey, outputKey] of Object.entries(fieldMap)) {
-        if (!outputKey || protectedSet.has(sourceKey) || isDroppedSource(sourceKey, dropSet)) {
+    for (const [sourceKey, entry] of Object.entries(entries)) {
+        if (protectedSet.has(sourceKey) || isDroppedSource(sourceKey, dropSet)) {
             continue;
         }
         const value = getValue(payload, sourceKey);
@@ -98,13 +102,15 @@ export function buildMappedAnalyticsPayload(
             continue;
         }
         removeValue(out, sourceKey);
-        out[outputKey] = value.value;
+        // Format runs on the raw canonical value, before hashing, so a hashed
+        // phone/email is hashed in its normalised form — same as the server.
+        out[entry.to] = entry.type && entry.format ? formatFieldValue(value.value, entry.type, entry.format) : value.value;
     }
 
     pruneEmptyContainers(out);
 
     for (const key of [...(mapping?.hash_keys ?? []), ...globalHashes]) {
-        const targetKey = fieldMap[key] || key;
+        const targetKey = entries[key]?.to ?? key;
         if (!protectedSet.has(targetKey)) {
             hashValueAt(out, targetKey);
         }

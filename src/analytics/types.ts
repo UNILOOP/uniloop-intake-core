@@ -1,5 +1,7 @@
 // Analytics provider types and interfaces
 
+import type { FieldMapValue } from './fieldFormats';
+
 /**
  * Merchant-defined event mapping. Same shape as the one the backend returns
  * from /api/analytics/config. Kept as an unknown-valued object here so this
@@ -24,7 +26,11 @@ export interface AnalyticsEventMappings {
 export interface AnalyticsChannelMapping {
     enabled?: boolean;
     name?: string;
-    field_map?: Record<string, string>;
+    /**
+     * Canonical source key → output key (string shorthand) or a field-map
+     * entry object `{ to, level, type, format }`; see fieldFormats.ts.
+     */
+    field_map?: Record<string, FieldMapValue>;
     drop_keys?: string[];
     hash_keys?: string[];
     extra_fields?: Record<string, unknown>;

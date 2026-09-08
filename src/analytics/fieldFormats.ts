@@ -167,6 +167,25 @@ export interface NormalizedFieldMapEntry {
 }
 
 /**
+ * The object form of an extra_fields value. The legacy scalar/object form is
+ * shorthand for a nested static value; use this wrapper when a static key needs
+ * to be hoisted to the channel envelope.
+ */
+export interface ExtraFieldEntry {
+    value: unknown;
+    level?: FieldMapLevel;
+}
+
+export type JsonLikeValue = string | number | boolean | null | JsonLikeValue[] | { [key: string]: JsonLikeValue };
+
+export type ExtraFieldValue = JsonLikeValue | ExtraFieldEntry;
+
+export interface NormalizedExtraFieldEntry {
+    value: unknown;
+    level: FieldMapLevel;
+}
+
+/**
  * Normalise a raw field_map value. Returns null when no output key can be
  * produced (blank strings, malformed objects), which callers treat as "skip".
  * Unknown types/formats are ignored rather than rejected so a stale mapping
@@ -225,17 +244,63 @@ export function serializeFieldMapEntry(entry: NormalizedFieldMapEntry): FieldMap
 }
 
 /**
+ * Normalise one extra_fields value. Unlike field_map entries, the object key is
+ * already the output key, so the wrapper only carries the static value and the
+ * requested data-layer level.
+ */
+export function normalizeExtraFieldEntry(raw: unknown): NormalizedExtraFieldEntry {
+    if (isRecord(raw) && Object.prototype.hasOwnProperty.call(raw, 'value')) {
+        return {
+            value: raw.value,
+            level: raw.level === 0 || raw.level === '0' ? FIELD_MAP_LEVEL_ROOT : FIELD_MAP_LEVEL_NESTED,
+        };
+    }
+
+    return { value: raw, level: FIELD_MAP_LEVEL_NESTED };
+}
+
+/**
+ * Normalise a whole extra_fields map keyed by outgoing static key.
+ */
+export function normalizeExtraFields(
+    extraFields: Record<string, unknown> | undefined | null,
+): Record<string, NormalizedExtraFieldEntry> {
+    const entries: Record<string, NormalizedExtraFieldEntry> = {};
+    for (const [key, raw] of Object.entries(extraFields ?? {})) {
+        if (key === '') continue;
+        entries[key] = normalizeExtraFieldEntry(raw);
+    }
+    return entries;
+}
+
+/**
+ * Collapse a normalised static field back to the compact legacy value unless
+ * the merchant explicitly selected a non-default level.
+ */
+export function serializeExtraFieldEntry(entry: NormalizedExtraFieldEntry): ExtraFieldValue {
+    if (entry.level === FIELD_MAP_LEVEL_NESTED) {
+        return entry.value as ExtraFieldValue;
+    }
+
+    return { value: entry.value, level: FIELD_MAP_LEVEL_ROOT };
+}
+
+/**
  * Split a mapped (flat) payload into the keys that belong at data-layer level
- * 0 and the rest, according to the mapping's field_map entries. Keys are only
- * hoisted when they actually exist in the payload.
+ * 0 and the rest, according to the mapping's field_map and extra_fields
+ * entries. Keys are only hoisted when they actually exist in the payload.
  */
 export function splitRootLevelKeys(
     payload: Record<string, unknown>,
     fieldMap: Record<string, unknown> | undefined | null,
+    extraFields?: Record<string, unknown> | undefined | null,
 ): { root: Record<string, unknown>; nested: Record<string, unknown> } {
     const rootKeys = new Set<string>();
     for (const entry of Object.values(normalizeFieldMap(fieldMap))) {
         if (entry.level === FIELD_MAP_LEVEL_ROOT) rootKeys.add(entry.to);
+    }
+    for (const [key, entry] of Object.entries(normalizeExtraFields(extraFields))) {
+        if (entry.level === FIELD_MAP_LEVEL_ROOT) rootKeys.add(key);
     }
 
     const root: Record<string, unknown> = {};

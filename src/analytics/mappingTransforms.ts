@@ -1,5 +1,5 @@
 import type { AnalyticsChannelMapping } from './types';
-import { formatFieldValue, normalizeFieldMap } from './fieldFormats';
+import { formatFieldValue, normalizeExtraFields, normalizeFieldMap } from './fieldFormats';
 
 function rightRotate(value: number, amount: number): number {
     return (value >>> amount) | (value << (32 - amount));
@@ -116,7 +116,9 @@ export function buildMappedAnalyticsPayload(
         }
     }
 
-    Object.assign(out, mapping?.extra_fields ?? {});
+    for (const [key, entry] of Object.entries(normalizeExtraFields(mapping?.extra_fields))) {
+        out[key] = entry.value;
+    }
 
     return out;
 }

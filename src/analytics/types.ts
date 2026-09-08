@@ -1,6 +1,6 @@
 // Analytics provider types and interfaces
 
-import type { FieldMapValue } from './fieldFormats';
+import type { ExtraFieldValue, FieldMapValue } from './fieldFormats';
 
 /**
  * Merchant-defined event mapping. Same shape as the one the backend returns
@@ -33,7 +33,7 @@ export interface AnalyticsChannelMapping {
     field_map?: Record<string, FieldMapValue>;
     drop_keys?: string[];
     hash_keys?: string[];
-    extra_fields?: Record<string, unknown>;
+    extra_fields?: Record<string, ExtraFieldValue>;
 }
 
 /**

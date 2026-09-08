@@ -172,14 +172,15 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
         this.pushToDataLayer(gtmEvent);
 
         // The wrapped push nests the mapped event under `eventDetails` (data
-        // layer level 1). Hoist any field_map outputs the merchant placed at
-        // level 0 next to `event` so a top-level dataLayer variable reaches
-        // them here too; `event` itself is never overridable.
-        const { root } = splitRootLevelKeys(gtmEvent, mapping?.field_map);
+        // layer level 1). Hoist any field_map outputs or static extra_fields
+        // the merchant placed at level 0 next to `event` so a top-level
+        // dataLayer variable reaches them here too; `event` itself is never
+        // overridable.
+        const { root, nested } = splitRootLevelKeys(gtmEvent, mapping?.field_map, mapping?.extra_fields);
         this.pushToDataLayer({
             ...root,
             event: 'survey_event',
-            eventDetails: gtmEvent,
+            eventDetails: nested,
         });
     }
 

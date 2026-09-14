@@ -46,6 +46,8 @@ export interface CustomPixelInstance {
     key: string;
     vendor: string | null;
     pixel_id: string | null;
+    /** Apply the HIPAA output filter to this pixel's payloads (server ships the channel setting). */
+    hipaa_filter?: boolean;
 }
 
 export interface AnalyticsConfig {
@@ -73,6 +75,8 @@ export interface AnalyticsConfig {
         preview?: string;
         debug?: boolean;
         eventMappings?: AnalyticsEventMappings;
+        /** Apply the HIPAA output filter to dataLayer payloads (merchant's gtm_format_hipaa). */
+        hipaaFilter?: boolean;
     };
     // Meta (Facebook) Pixel and Conversion API configuration
     meta?: {
@@ -81,6 +85,8 @@ export interface AnalyticsConfig {
         testEventCode?: string; // For testing events
         debug?: boolean;
         eventMappings?: AnalyticsEventMappings;
+        /** Apply the HIPAA output filter to pixel payloads (merchant's meta_format_hipaa). */
+        hipaaFilter?: boolean;
     };
     /**
      * Merchant-configured custom browser pixels (TikTok, Snapchat, …). Each

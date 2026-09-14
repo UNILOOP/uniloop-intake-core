@@ -6,3 +6,4 @@ export { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
 export { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 export { MetaPixelProvider } from './providers/MetaPixelProvider';
 export { CustomPixelProvider } from './providers/CustomPixelProvider';
+export { HIPAA_SENSITIVE_FIELDS, filterHipaaPayload, isHipaaSensitiveKey } from './hipaaFilter';

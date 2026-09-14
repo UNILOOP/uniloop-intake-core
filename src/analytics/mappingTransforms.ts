@@ -1,5 +1,6 @@
 import type { AnalyticsChannelMapping } from './types';
-import { formatFieldValue, normalizeExtraFields, normalizeFieldMap } from './fieldFormats';
+import { FIELD_MAP_LEVEL_ROOT, formatFieldValue, normalizeExtraFields, normalizeFieldMap } from './fieldFormats';
+import { filterHipaaPayload } from './hipaaFilter';
 
 function rightRotate(value: number, amount: number): number {
     return (value >>> amount) | (value << (32 - amount));
@@ -78,23 +79,23 @@ export function buildMappedAnalyticsPayload(
     globalDrops: string[] = [],
     globalHashes: string[] = [],
     protectedKeys: string[] = [],
+    hipaaFilter = false,
 ): Record<string, unknown> {
-    // Entries carry the output key plus an optional value format; the
-    // data-layer level is applied by the caller (see splitRootLevelKeys), since
-    // only the caller knows whether its envelope nests the payload.
+    // Mirrors App\Services\Analytics\EventMappingResolver::buildPayload():
+    // rename/format → drop (matched on the post-rename keys) → hash → HIPAA
+    // filter on the output keys (when the channel asks for it) → static
+    // fields → level-0 keys first. A rename therefore wins over a drop or a
+    // HIPAA rule that names its SOURCE key; only the output key is judged
+    // afterwards. Entries carry the output key plus an optional value format;
+    // whether a level-0 key is hoisted out of the flat object is up to the
+    // caller (see splitRootLevelKeys), since only the caller knows its envelope.
     const entries = normalizeFieldMap(mapping?.field_map);
     const out = clonePayload(payload);
     const protectedSet = new Set(protectedKeys);
-    const dropSet = new Set<string>([...(mapping?.drop_keys ?? []), ...globalDrops]);
-
-    for (const key of dropSet) {
-        if (!protectedSet.has(key)) {
-            removeValue(out, key);
-        }
-    }
+    const rootKeys = new Set<string>();
 
     for (const [sourceKey, entry] of Object.entries(entries)) {
-        if (protectedSet.has(sourceKey) || isDroppedSource(sourceKey, dropSet)) {
+        if (protectedSet.has(sourceKey)) {
             continue;
         }
         const value = getValue(payload, sourceKey);
@@ -105,6 +106,18 @@ export function buildMappedAnalyticsPayload(
         // Format runs on the raw canonical value, before hashing, so a hashed
         // phone/email is hashed in its normalised form — same as the server.
         out[entry.to] = entry.type && entry.format ? formatFieldValue(value.value, entry.type, entry.format) : value.value;
+        if (entry.level === FIELD_MAP_LEVEL_ROOT) {
+            rootKeys.add(entry.to);
+        }
+    }
+
+    pruneEmptyContainers(out);
+
+    const dropSet = new Set<string>([...(mapping?.drop_keys ?? []), ...globalDrops]);
+    for (const key of dropSet) {
+        if (!protectedSet.has(key)) {
+            removeValue(out, key);
+        }
     }
 
     pruneEmptyContainers(out);
@@ -116,11 +129,41 @@ export function buildMappedAnalyticsPayload(
         }
     }
 
+    // Static fields are merchant literals, never PHI, so they merge after the filter.
+    const filtered = hipaaFilter ? filterHipaaPayload(out, protectedKeys) : out;
+
     for (const [key, entry] of Object.entries(normalizeExtraFields(mapping?.extra_fields))) {
-        out[key] = entry.value;
+        filtered[key] = entry.value;
+        if (entry.level === FIELD_MAP_LEVEL_ROOT) {
+            rootKeys.add(key);
+        }
     }
 
-    return out;
+    return orderRootKeysFirst(filtered, rootKeys);
+}
+
+/**
+ * Level-0 keys lead the payload (same as the server), keeping their relative
+ * order; everything else follows in its existing order.
+ */
+function orderRootKeysFirst(payload: Record<string, unknown>, rootKeys: Set<string>): Record<string, unknown> {
+    if (rootKeys.size === 0) {
+        return payload;
+    }
+
+    const ordered: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+        if (rootKeys.has(key)) {
+            ordered[key] = value;
+        }
+    }
+    for (const [key, value] of Object.entries(payload)) {
+        if (!rootKeys.has(key)) {
+            ordered[key] = value;
+        }
+    }
+
+    return ordered;
 }
 
 function clonePayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -216,22 +259,6 @@ function pruneEmptyContainers(payload: Record<string, unknown>): void {
             delete payload[key];
         }
     }
-}
-
-function isDroppedSource(sourceKey: string, dropSet: Set<string>): boolean {
-    if (dropSet.has(sourceKey)) {
-        return true;
-    }
-
-    const segments = sourceKey.split('.');
-    while (segments.length > 1) {
-        segments.pop();
-        if (dropSet.has(segments.join('.'))) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

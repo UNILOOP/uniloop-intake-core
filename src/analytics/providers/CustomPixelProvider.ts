@@ -326,7 +326,7 @@ export class CustomPixelProvider implements AnalyticsProvider {
                 continue;
             }
 
-            const payload = this.buildPayload(event, mapping, pixel.key);
+            const payload = this.buildPayload(event, mapping, pixel);
             vendor.track(pixel.pixel_id, mapping.name, payload);
 
             if (this.debug) {
@@ -335,7 +335,8 @@ export class CustomPixelProvider implements AnalyticsProvider {
         }
     }
 
-    private buildPayload(event: SurveyAnalyticsEvent, mapping: AnalyticsChannelMapping, channelKey: string): Record<string, unknown> {
+    private buildPayload(event: SurveyAnalyticsEvent, mapping: AnalyticsChannelMapping, pixel: CustomPixelInstance): Record<string, unknown> {
+        const channelKey = pixel.key;
         const rawData: Record<string, unknown> = {
             category: event.category,
             action: event.action,
@@ -355,6 +356,8 @@ export class CustomPixelProvider implements AnalyticsProvider {
             mapping,
             this.eventMappings?.global_drop_keys?.[channelKey] ?? [],
             this.eventMappings?.global_hash_keys?.[channelKey] ?? [],
+            [],
+            pixel.hipaa_filter ?? false,
         );
     }
 

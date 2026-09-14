@@ -10,6 +10,7 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
     private userId?: string;
     private debug = false;
     private eventMappings?: AnalyticsEventMappings;
+    private hipaaFilter = false;
 
     async initialize(config: {
         containerId: string;
@@ -19,12 +20,14 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
         sessionId?: string;
         userId?: string;
         eventMappings?: AnalyticsEventMappings;
+        hipaaFilter?: boolean;
     }): Promise<void> {
         this.containerId = config.containerId;
         this.debug = config.debug || false;
         this.sessionId = config.sessionId;
         this.userId = config.userId;
         this.eventMappings = config.eventMappings;
+        this.hipaaFilter = config.hipaaFilter ?? false;
 
         // Initialize dataLayer if it doesn't exist
         window.dataLayer = window.dataLayer || [];
@@ -167,6 +170,7 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
             this.eventMappings?.global_drop_keys?.google_tag_manager ?? [],
             this.eventMappings?.global_hash_keys?.google_tag_manager ?? [],
             ['event'],
+            this.hipaaFilter,
         ) as GTMDataLayerEvent;
 
         this.pushToDataLayer(gtmEvent);

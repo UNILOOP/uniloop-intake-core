@@ -10,6 +10,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
     private userId?: string;
     private debug = false;
     private eventMappings?: AnalyticsEventMappings;
+    private hipaaFilter = false;
 
     async initialize(config: {
         pixelId: string;
@@ -18,6 +19,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
         sessionId?: string;
         userId?: string;
         eventMappings?: AnalyticsEventMappings;
+        hipaaFilter?: boolean;
     }): Promise<void> {
         this.pixelId = config.pixelId;
         this.testEventCode = config.testEventCode;
@@ -25,6 +27,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
         this.sessionId = config.sessionId;
         this.userId = config.userId;
         this.eventMappings = config.eventMappings;
+        this.hipaaFilter = config.hipaaFilter ?? false;
 
         if (this.debug) {
             console.log('[MetaPixel] Initializing with pixel ID:', this.pixelId);
@@ -188,6 +191,8 @@ export class MetaPixelProvider implements AnalyticsProvider {
             mapping,
             this.eventMappings?.global_drop_keys?.meta ?? [],
             this.eventMappings?.global_hash_keys?.meta ?? [],
+            [],
+            this.hipaaFilter,
         );
 
         return { eventName, customData };

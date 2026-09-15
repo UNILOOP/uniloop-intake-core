@@ -528,7 +528,7 @@ export interface SurveyFormContextProps {
   isLastPage: boolean;
   isSubmitting: boolean;
   isValid: boolean;
-  submit: () => void;
+  submit: (overrideValues?: Record<string, unknown>) => void;
   language: string;
   setLanguage: (lang: string) => void;
   theme: ThemeDefinition;

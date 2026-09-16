@@ -99,7 +99,6 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
     goToNextBlock,
     goToPreviousBlock,
     isLastPage,
-    submit,
     isValid,
     theme,
     surveyData,
@@ -157,11 +156,9 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentBlock = currentPageBlocks[currentBlockIndex];
-    if (currentBlock?.isEndBlock) {
-      submit();
-      return;
-    }
+    // goToNextBlock validates the current block before it navigates, and it
+    // submits itself on an end block or the final step, so the Continue button
+    // can never skip validation either.
     goToNextBlock();
   };
 

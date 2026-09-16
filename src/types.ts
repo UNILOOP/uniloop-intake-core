@@ -543,7 +543,7 @@ export interface SurveyFormContextProps {
   evaluateCondition: (condition: string, contextData?: Record<string, any>) => boolean;
   getNextPageIndex: () => number | null;
   getVisibleBlocks: (blocks: BlockData[]) => BlockData[];
-  validateField: (fieldName: string, value: any) => string | null;
+  validateField: (fieldName: string, value: any, formValues?: Record<string, any>) => string | null;
   enableDebug?: boolean;
   logo?: any;
   abTestPreviewMode?: boolean;

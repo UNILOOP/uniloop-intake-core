@@ -696,10 +696,23 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     return currentPage + 1 < totalPages ? currentPage + 1 : null;
   }, [currentPage, pages, totalPages, values, computedValues]);
 
-  const validateField = useCallback((fieldName: string, value: any): string | null => {
-    // First check for block-level validation using validateValue method
+  const validateField = useCallback((
+    fieldName: string,
+    value: any,
+    formValues?: Record<string, any>
+  ): string | null => {
+    // Validation context: prefer values supplied by the caller (they may not be
+    // committed to state yet, e.g. during auto-continue) over the render snapshot.
+    const validationContext = { ...(formValues ?? values), ...computedValues };
+
+    // First check for block-level validation using validateValue method.
+    // Prefer the block currently being answered so a duplicate field name on
+    // another page cannot shadow its rules.
+    const activeBlock = (pages[currentPage] || [])[currentBlockIndex];
     const allBlocks = pages.flat();
-    const block = allBlocks.find(block => block.fieldName === fieldName);
+    const block = activeBlock?.fieldName === fieldName
+      ? activeBlock
+      : allBlocks.find(block => block.fieldName === fieldName);
     
     if (block) {
       const blockDefinition = getBlockDefinition(block.type);
@@ -721,7 +734,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
           try {
             // Skip if there's a condition and it doesn't evaluate to true
             if (rule.condition) {
-              const conditionResult = evaluateConditionWithContext(rule.condition, { ...values, ...computedValues });
+              const conditionResult = evaluateConditionWithContext(rule.condition, validationContext);
               if (!conditionResult) {
                 continue;
               }
@@ -729,7 +742,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
             // Apply the validation rule
             const validationFunction = validationRuleToFunction(rule);
-            const validationError = validationFunction(value, { ...values, ...computedValues });
+            const validationError = validationFunction(value, validationContext);
             
             if (validationError && rule.severity !== 'warning') {
               return validationError;
@@ -746,7 +759,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     const validator = customValidators[fieldName];
     if (validator) {
       try {
-        const error = validator.validate(value, { ...values, ...computedValues });
+        const error = validator.validate(value, validationContext);
         return error;
       } catch (error) {
         console.error(`Error validating field ${fieldName}:`, error);
@@ -755,7 +768,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     }
 
     return null;
-  }, [customValidators, values, computedValues, pages, evaluateConditionWithContext]);
+  }, [customValidators, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext]);
 
   // Calculate if the current page is valid
   const currentPageBlocks = pages[currentPage] || [];
@@ -800,7 +813,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         }
       }
 
-      const validationError = validateField(field, value);
+      const validationError = validateField(field, value, updatedValues);
       if (validationError) {
         setConditionalErrors(prev => ({ ...prev, [field]: validationError }));
       } else {
@@ -854,33 +867,35 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
     const mergedValues = fValue ? { ...values, ...fValue } : values;
 
-    if (currentBlock?.isEndBlock) {
-      submit(mergedValues);
-      return;
-    }
     if (fValue) {
       setValues(prev => ({ ...prev, ...fValue }));
     }
 
-    // Validate current field and show errors (but don't block navigation)
+    // Validate the current field against the values being submitted before any
+    // navigation or submission. Auto-continue calls this synchronously right after
+    // the selection, so the `values` render snapshot may not include the new
+    // answer yet; `mergedValues` always does.
     if (currentBlock?.fieldName) {
       const fieldName = currentBlock.fieldName;
       const currentValue = mergedValues[fieldName];
-      
-      // Run validation for the current field
-      const validationError = validateField(fieldName, currentValue);
+
+      const validationError = validateField(fieldName, currentValue, mergedValues);
       if (validationError) {
-        // Set the error but continue with navigation
         setConditionalErrors(prev => ({ ...prev, [fieldName]: validationError }));
         return; // Don't proceed if validation fails
-      } else {
-        // Clear any existing error for this field
-        setConditionalErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[fieldName];
-          return newErrors;
-        });
       }
+
+      // Clear any existing error for this field
+      setConditionalErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+
+    if (currentBlock?.isEndBlock) {
+      submit(mergedValues);
+      return;
     }
 
     const target = getNextStepFromNavigationRules(

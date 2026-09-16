@@ -1,4 +1,4 @@
-import type { AnalyticsChannelMapping, AnalyticsEventMappings, AnalyticsProvider, CustomPixelInstance, SurveyAnalyticsEvent } from '../types';
+import type { AnalyticsChannelMapping, AnalyticsEventMappings, AnalyticsProvider, CustomPixelInstance, ProviderAnalyticsEvent } from '../types';
 import { buildMappedAnalyticsPayload } from '../mappingTransforms';
 
 /**
@@ -307,7 +307,7 @@ export class CustomPixelProvider implements AnalyticsProvider {
         }
     }
 
-    trackEvent(event: SurveyAnalyticsEvent): void {
+    trackEvent(event: ProviderAnalyticsEvent): void {
         if (!this.initialized || typeof window === 'undefined' || this.pixels.length === 0) {
             return;
         }
@@ -335,7 +335,7 @@ export class CustomPixelProvider implements AnalyticsProvider {
         }
     }
 
-    private buildPayload(event: SurveyAnalyticsEvent, mapping: AnalyticsChannelMapping, pixel: CustomPixelInstance): Record<string, unknown> {
+    private buildPayload(event: ProviderAnalyticsEvent, mapping: AnalyticsChannelMapping, pixel: CustomPixelInstance): Record<string, unknown> {
         const channelKey = pixel.key;
         const rawData: Record<string, unknown> = {
             category: event.category,

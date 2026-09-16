@@ -66,6 +66,8 @@ export interface AnalyticsConfig {
     // Google Analytics configuration
     googleAnalytics?: {
         measurementId: string;
+        eventMappings?: AnalyticsEventMappings;
+        hipaaFilter?: boolean;
         debug?: boolean;
     };
     // Google Tag Manager configuration
@@ -74,9 +76,9 @@ export interface AnalyticsConfig {
         auth?: string;
         preview?: string;
         debug?: boolean;
-        eventMappings?: AnalyticsEventMappings;
+          eventMappings?: AnalyticsEventMappings;
         /** Apply the HIPAA output filter to dataLayer payloads (merchant's gtm_format_hipaa). */
-        hipaaFilter?: boolean;
+          hipaaFilter?: boolean;
     };
     // Meta (Facebook) Pixel and Conversion API configuration
     meta?: {
@@ -84,9 +86,9 @@ export interface AnalyticsConfig {
         accessToken?: string; // For Conversion API
         testEventCode?: string; // For testing events
         debug?: boolean;
-        eventMappings?: AnalyticsEventMappings;
+          eventMappings?: AnalyticsEventMappings;
         /** Apply the HIPAA output filter to pixel payloads (merchant's meta_format_hipaa). */
-        hipaaFilter?: boolean;
+          hipaaFilter?: boolean;
     };
     /**
      * Merchant-configured custom browser pixels (TikTok, Snapchat, …). Each
@@ -97,7 +99,7 @@ export interface AnalyticsConfig {
     customPixels?: {
         pixels: CustomPixelInstance[];
         debug?: boolean;
-        eventMappings?: AnalyticsEventMappings;
+          eventMappings?: AnalyticsEventMappings;
     };
     // Custom event handler function
     trackEvent?: (event: any) => void;
@@ -125,6 +127,12 @@ export interface SurveyAnalyticsEvent {
     timestamp?: number;
     metadata?: Record<string, any>;
 }
+
+/** Canonical events accepted internally by providers, including page views and timing calls. */
+export type ProviderAnalyticsEvent = Omit<SurveyAnalyticsEvent, 'category' | 'action'> & {
+    category: string;
+    action: string;
+};
 
 export type SurveyAction =
     | 'user_authenticated'

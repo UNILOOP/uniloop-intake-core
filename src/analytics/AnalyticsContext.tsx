@@ -63,6 +63,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           const gaProvider = new GoogleAnalyticsProvider();
           await gaProvider.initialize({
             ...config.googleAnalytics,
+            eventMappings: config.googleAnalytics.eventMappings ?? config.eventMappings,
             debug: debug || config.googleAnalytics.debug,
             sessionId: config.sessionId,
             userId: config.userId
@@ -78,6 +79,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           const gtmProvider = new GoogleTagManagerProvider();
           await gtmProvider.initialize({
             ...config.googleTagManager,
+            eventMappings: config.googleTagManager.eventMappings ?? config.eventMappings,
             debug: debug || config.googleTagManager.debug,
             sessionId: config.sessionId,
             userId: config.userId
@@ -96,6 +98,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           const metaProvider = new MetaPixelProvider();
           await metaProvider.initialize({
             ...config.meta,
+            eventMappings: config.meta.eventMappings ?? config.eventMappings,
             debug: debug || config.meta.debug,
             sessionId: config.sessionId,
             userId: config.userId
@@ -114,6 +117,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           const customPixelProvider = new CustomPixelProvider();
           await customPixelProvider.initialize({
             ...config.customPixels,
+            eventMappings: config.customPixels.eventMappings ?? config.eventMappings,
             debug: debug || config.customPixels.debug,
             sessionId: config.sessionId,
             userId: config.userId

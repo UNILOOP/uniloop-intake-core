@@ -1,4 +1,5 @@
-import type { AnalyticsEventMappings, AnalyticsProvider, SurveyAnalyticsEvent } from '../types';
+import type { AnalyticsEventMappings, AnalyticsProvider, ProviderAnalyticsEvent } from '../types';
+import { META_STANDARD_EVENTS } from '../metaEvents';
 import { buildMappedAnalyticsPayload } from '../mappingTransforms';
 
 export class MetaPixelProvider implements AnalyticsProvider {
@@ -139,7 +140,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
         }
     }
 
-    private mapEventToMetaEvent(event: SurveyAnalyticsEvent): { eventName: string; customData: Record<string, any> } {
+    private mapEventToMetaEvent(event: ProviderAnalyticsEvent): { eventName: string; customData: Record<string, any> } {
         // Start from the merchant mapping (sent by the backend via /api/analytics/config).
         // Mapping shape is action → channel → { name, field_map }, so we index
         // into the meta channel specifically.
@@ -198,12 +199,12 @@ export class MetaPixelProvider implements AnalyticsProvider {
         return { eventName, customData };
     }
 
-    trackEvent(event: SurveyAnalyticsEvent): void {
+    trackEvent(event: ProviderAnalyticsEvent): void {
         if (!this.initialized || !window.fbq) return;
         if (this.eventMappings?.events?.[event.action]?.meta?.enabled === false) return;
 
         const { eventName, customData } = this.mapEventToMetaEvent(event);
-        window.fbq('track', eventName, customData);
+        window.fbq(META_STANDARD_EVENTS.has(eventName) ? 'track' : 'trackCustom', eventName, customData);
 
         if (this.debug) {
             console.log('[MetaPixel] Event tracked:', eventName, customData);
@@ -211,8 +212,15 @@ export class MetaPixelProvider implements AnalyticsProvider {
     }
 
     trackPageView(url: string, title?: string, additionalData?: Record<string, any>): void {
+        if (this.eventMappings) {
+            this.trackEvent({
+                action: 'page_view', category: 'page', label: title,
+                metadata: { page_path: url, page_title: title, source_url: url, ...additionalData },
+            });
+            return;
+        }
+
         if (!this.initialized || !window.fbq) return;
-        if (this.eventMappings?.events?.page_view?.meta?.enabled === false) return;
 
         const pageData = {
             page_path: url,
@@ -232,6 +240,14 @@ export class MetaPixelProvider implements AnalyticsProvider {
     }
 
     trackTiming(category: string, variable: string, value: number, label?: string): void {
+        if (this.eventMappings) {
+            this.trackEvent({
+                action: 'timing', category, label, value,
+                metadata: { variable, timing_ms: value },
+            });
+            return;
+        }
+
         if (!this.initialized || !window.fbq) return;
 
         const timingData = {
@@ -254,6 +270,12 @@ export class MetaPixelProvider implements AnalyticsProvider {
     }
 
     setUserProperties(properties: Record<string, any>): void {
+        if (this.eventMappings) {
+            if (properties.user_id) this.userId = properties.user_id;
+            this.trackEvent({ action: 'set_properties', category: 'user', metadata: { properties } });
+            return;
+        }
+
         if (!this.initialized || !window.fbq) return;
 
         // Update internal user ID if provided

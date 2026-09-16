@@ -374,6 +374,8 @@ export interface SurveyFormRendererProps {
     eventMappings?: import('./analytics/types').AnalyticsEventMappings;
     googleAnalytics?: {
       measurementId: string;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
+      hipaaFilter?: boolean;
       debug?: boolean;
     };
     googleTagManager?: {

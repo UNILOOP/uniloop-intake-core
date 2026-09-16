@@ -1,4 +1,4 @@
-import type { AnalyticsEventMappings, AnalyticsProvider, GTMDataLayerEvent, SurveyAnalyticsEvent } from '../types';
+import type { AnalyticsEventMappings, AnalyticsProvider, GTMDataLayerEvent, ProviderAnalyticsEvent } from '../types';
 import { buildMappedAnalyticsPayload } from '../mappingTransforms';
 import { splitRootLevelKeys } from '../fieldFormats';
 
@@ -126,7 +126,7 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
         }
     }
 
-    trackEvent(event: SurveyAnalyticsEvent): void {
+    trackEvent(event: ProviderAnalyticsEvent): void {
         if (!this.initialized) return;
 
         const mapping = this.eventMappings?.events?.[event.action]?.google_tag_manager;
@@ -164,6 +164,15 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
             });
         }
 
+        if (mapping) {
+            Object.assign(rawEvent, {
+                category: event.category,
+                action: event.action,
+                label: event.label,
+                value: event.value,
+            });
+        }
+
         const gtmEvent = buildMappedAnalyticsPayload(
             rawEvent,
             mapping,
@@ -189,8 +198,15 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
     }
 
     trackPageView(url: string, title?: string, additionalData?: Record<string, any>): void {
+        if (this.eventMappings) {
+            this.trackEvent({
+                action: 'page_view', category: 'page', label: title,
+                metadata: { page_path: url, page_title: title, source_url: url, ...additionalData },
+            });
+            return;
+        }
+
         if (!this.initialized) return;
-        if (this.eventMappings?.events?.page_view?.google_tag_manager?.enabled === false) return;
 
         const pageViewEvent: GTMDataLayerEvent = {
             event: 'survey_page_view',
@@ -214,6 +230,14 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
     }
 
     trackTiming(category: string, variable: string, value: number, label?: string): void {
+        if (this.eventMappings) {
+            this.trackEvent({
+                action: 'timing', category, label, value,
+                metadata: { variable, timing_ms: value },
+            });
+            return;
+        }
+
         if (!this.initialized) return;
 
         const timingEvent: GTMDataLayerEvent = {
@@ -231,6 +255,12 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
     }
 
     setUserProperties(properties: Record<string, any>): void {
+        if (this.eventMappings) {
+            if (properties.user_id) this.userId = properties.user_id;
+            this.trackEvent({ action: 'set_properties', category: 'user', metadata: { properties } });
+            return;
+        }
+
         if (!this.initialized) return;
 
         // Update internal user ID if provided

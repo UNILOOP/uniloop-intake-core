@@ -1,4 +1,5 @@
-import type { AnalyticsProvider, SurveyAnalyticsEvent } from '../types';
+import { buildMappedAnalyticsPayload } from '../mappingTransforms';
+import type { AnalyticsEventMappings, AnalyticsProvider, ProviderAnalyticsEvent } from '../types';
 import { loadGoogleAnalyticsNative } from './GoogleAnalyticsScript';
 
 export class GoogleAnalyticsProvider implements AnalyticsProvider {
@@ -8,14 +9,20 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
   private sessionId?: string;
   private userId?: string;
   private debug = false;
+  private eventMappings?: AnalyticsEventMappings;
+  private hipaaFilter = false;
 
   async initialize(config: { 
-    measurementId: string; 
+    measurementId: string;
+    eventMappings?: AnalyticsEventMappings;
+    hipaaFilter?: boolean;
     debug?: boolean;
     sessionId?: string;
     userId?: string;
   }): Promise<void> {
     this.measurementId = config.measurementId;
+    this.eventMappings = config.eventMappings;
+    this.hipaaFilter = config.hipaaFilter ?? false;
     this.debug = config.debug || false;
     this.sessionId = config.sessionId;
     this.userId = config.userId;
@@ -198,8 +205,11 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
     }
   }
 
-  trackEvent(event: SurveyAnalyticsEvent): void {
+  trackEvent(event: ProviderAnalyticsEvent): void {
     if (!this.initialized || !window.gtag) return;
+
+    const mapping = this.eventMappings?.events?.[event.action]?.google_analytics;
+    if (mapping?.enabled === false) return;
 
     const eventData: any = {
       event_category: event.category,
@@ -241,7 +251,22 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
       eventData[key] === undefined && delete eventData[key]
     );
 
-    window.gtag('event', event.action, eventData);
+    const globalDrops = this.eventMappings?.global_drop_keys?.google_analytics ?? [];
+    const globalHashes = this.eventMappings?.global_hash_keys?.google_analytics ?? [];
+    const canonicalData = mapping || globalDrops.length || globalHashes.length
+      ? {
+          ...eventData,
+          category: event.category,
+          action: event.action,
+          label: event.label,
+          value: event.value,
+          timestamp: event.timestamp || Date.now(),
+          ...(event.metadata ?? {}),
+        }
+      : eventData;
+    Object.keys(canonicalData).forEach((key) => canonicalData[key] === undefined && delete canonicalData[key]);
+    const payload = buildMappedAnalyticsPayload(canonicalData, mapping, globalDrops, globalHashes, [], this.hipaaFilter);
+    window.gtag('event', mapping?.name ?? event.action, payload);
 
     if (this.debug) {
       console.log('[GA] Event tracked:', event.action, eventData);
@@ -249,6 +274,14 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
   }
 
   trackPageView(url: string, title?: string, additionalData?: Record<string, any>): void {
+    if (this.eventMappings) {
+      this.trackEvent({
+        action: 'page_view', category: 'page', label: title,
+        metadata: { page_path: url, page_title: title, source_url: url, ...additionalData },
+      });
+      return;
+    }
+
     if (!this.initialized || !window.gtag) return;
 
     const pageData: any = {
@@ -272,6 +305,14 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
   }
 
   trackTiming(category: string, variable: string, value: number, label?: string): void {
+    if (this.eventMappings) {
+      this.trackEvent({
+        action: 'timing', category, label, value,
+        metadata: { variable, timing_ms: value },
+      });
+      return;
+    }
+
     if (!this.initialized || !window.gtag) return;
 
     const timingData: any = {
@@ -296,6 +337,12 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
   }
 
   setUserProperties(properties: Record<string, any>): void {
+    if (this.eventMappings) {
+      if (properties.user_id) this.userId = properties.user_id;
+      this.trackEvent({ action: 'set_properties', category: 'user', metadata: { properties } });
+      return;
+    }
+
     if (!this.initialized || !window.gtag) return;
 
     // Set user properties

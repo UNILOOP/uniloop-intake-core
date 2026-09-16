@@ -290,7 +290,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       userId: analytics.userId,
       customDimensions: analytics.customDimensions,
       eventMappings: mappings,
-      googleAnalytics: analytics.googleAnalytics,
+      googleAnalytics: analytics.googleAnalytics
+        ? { ...analytics.googleAnalytics, eventMappings: analytics.googleAnalytics.eventMappings ?? mappings }
+        : undefined,
       googleTagManager: analytics.googleTagManager
         ? { ...analytics.googleTagManager, eventMappings: analytics.googleTagManager.eventMappings ?? mappings }
         : undefined,

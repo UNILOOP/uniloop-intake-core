@@ -89,10 +89,18 @@ function filterRecord(record: Record<string, unknown>, protectedSet: Set<string>
             continue;
         }
 
-        out[key] = isRecord(value) ? filterRecord(value, protectedSet, true) : value;
+        out[key] = filterValue(value, protectedSet);
     }
 
     return out;
+}
+
+function filterValue(value: unknown, protectedSet: Set<string>): unknown {
+    if (Array.isArray(value)) {
+        return value.map((item) => filterValue(item, protectedSet));
+    }
+
+    return isRecord(value) ? filterRecord(value, protectedSet, true) : value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

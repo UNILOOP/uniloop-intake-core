@@ -133,7 +133,9 @@ export const useSurveyAnalytics = (options: SurveyAnalyticsOptions = {}) => {
     pageTitle?: string,
     totalPages?: number,
     blockLabel?: string,
-    surveyName?: string
+    surveyName?: string,
+    blockIndex?: number,
+    totalBlocks?: number
   ) => {
     // Track time spent on previous page
     if (currentPageRef.current !== pageIndex && options.trackTimings) {
@@ -158,12 +160,14 @@ export const useSurveyAnalytics = (options: SurveyAnalyticsOptions = {}) => {
         pageTitle,
         blockLabel,
         surveyName,
+        blockIndex,
+        totalBlocks,
         totalPages: totalPages || 0
       }
     };
 
-    // analytics.trackEvent(event);
-    analytics.trackPageView(`/survey/${toSlug(pageTitle ?? '')}/${toSlug(blockLabel ?? '')}`, pageTitle);
+    analytics.trackEvent(event);
+    analytics.trackPageView(`/survey/${toSlug(pageTitle ?? '')}/${toSlug(blockLabel ?? '')}`, pageTitle, event.metadata);
 
     if (options.debug) {
       console.log('[SurveyAnalytics] Page viewed', event);

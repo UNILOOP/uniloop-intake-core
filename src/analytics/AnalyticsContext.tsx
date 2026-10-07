@@ -9,7 +9,15 @@ import { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
 import { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 import { MetaPixelProvider } from './providers/MetaPixelProvider';
 import { CustomPixelProvider } from './providers/CustomPixelProvider';
+import { pixelEventProtectionActive, pixelSafeEvent, pixelSafeMetadata } from './pixelPrivacy';
 // import './utils/debugHelpers'; // Import debug helpers to make them available
+
+function consentAllows(category: 'analytics' | 'marketing'): boolean {
+  if (typeof window === 'undefined') return true;
+  const win = window as unknown as { UNILOOP_PIXEL_REQUIRED?: boolean; UNILOOP_PIXEL_STATE?: { ready?: boolean; requires_consent?: boolean; consent?: Record<string, boolean> } };
+  if (!win.UNILOOP_PIXEL_REQUIRED) return true;
+  return win.UNILOOP_PIXEL_STATE?.ready === true && win.UNILOOP_PIXEL_STATE.requires_consent !== true && win.UNILOOP_PIXEL_STATE.consent?.[category] === true;
+}
 
 const AnalyticsContext = createContext<AnalyticsContextValue | undefined>(undefined);
 
@@ -29,10 +37,17 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
   const [providers, setProviders] = useState<AnalyticsProvider[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
+  const [consentRevision, setConsentRevision] = useState(0);
+
+  useEffect(() => {
+    const refreshConsent = () => setConsentRevision(revision => revision + 1);
+    window.addEventListener('uniloop:consent', refreshConsent);
+    return () => window.removeEventListener('uniloop:consent', refreshConsent);
+  }, []);
 
   // Initialize analytics providers
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !consentAllows('marketing')) {
       if (debug) {
         console.log('[Analytics] Analytics disabled');
       }
@@ -66,7 +81,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
             eventMappings: config.googleAnalytics.eventMappings ?? config.eventMappings,
             debug: debug || config.googleAnalytics.debug,
             sessionId: config.sessionId,
-            userId: config.userId
+            userId: pixelEventProtectionActive() ? undefined : config.userId
           });
           activeProviders.push(gaProvider);
           if (debug) {
@@ -82,7 +97,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
             eventMappings: config.googleTagManager.eventMappings ?? config.eventMappings,
             debug: debug || config.googleTagManager.debug,
             sessionId: config.sessionId,
-            userId: config.userId
+            userId: pixelEventProtectionActive() ? undefined : config.userId
           });
           activeProviders.push(gtmProvider);
           if (debug) {
@@ -101,7 +116,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
             eventMappings: config.meta.eventMappings ?? config.eventMappings,
             debug: debug || config.meta.debug,
             sessionId: config.sessionId,
-            userId: config.userId
+            userId: pixelEventProtectionActive() ? undefined : config.userId
           });
           activeProviders.push(metaProvider);
           if (debug) {
@@ -120,7 +135,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
             eventMappings: config.customPixels.eventMappings ?? config.eventMappings,
             debug: debug || config.customPixels.debug,
             sessionId: config.sessionId,
-            userId: config.userId
+            userId: pixelEventProtectionActive() ? undefined : config.userId
           });
           activeProviders.push(customPixelProvider);
           if (debug) {
@@ -156,11 +171,11 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
       });
     };
-  }, [config, enabled, debug]);
+  }, [config, enabled, debug, consentRevision]);
 
   // Track event across all providers
   const trackEvent = useCallback((event: SurveyAnalyticsEvent) => {
-    if (!enabled || !isInitialized) return;
+    if (!enabled || !consentAllows('analytics')) return;
 
     // Call custom event handler if provided
     if (config.trackEvent) {
@@ -174,9 +189,10 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
+    if (!consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
-        provider.trackEvent(event);
+        provider.trackEvent(pixelSafeEvent(event));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Event tracked:`, event);
         }
@@ -188,23 +204,24 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Track page view across all providers
   const trackPageView = useCallback((url: string, title?: string, additionalData?: Record<string, any>) => {
-    if (!enabled || !isInitialized) return;
+    if (!enabled || !consentAllows('analytics')) return;
 
     // Call custom event handler if provided
     if (config.trackPageView) {
       try {
         config.trackPageView(url, title, additionalData);
         if (debug) {
-          console.log('[Analytics:CustomHandler] Page View sent to custom handler:', event);
+          console.log('[Analytics:CustomHandler] Page View sent to custom handler:', { url, title, additionalData });
         }
       } catch (error) {
         console.error('[Analytics:CustomHandler] Failed to call custom page view handler:', error);
       }
     }
 
+    if (!consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
-        provider.trackPageView(url, title, additionalData);
+        provider.trackPageView(pixelEventProtectionActive() ? window.location.origin + window.location.pathname : url, pixelEventProtectionActive() ? undefined : title, pixelSafeMetadata(additionalData));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Page view tracked:`, { url, title, additionalData });
         }
@@ -212,11 +229,11 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track page view:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug]);
+  }, [providers, enabled, isInitialized, debug, config]);
 
   // Track timing across all providers
   const trackTiming = useCallback((category: string, variable: string, value: number, label?: string) => {
-    if (!enabled || !isInitialized) return;
+    if (!enabled || !consentAllows('analytics')) return;
 
     // Call custom event handler if provided
     if (config.trackTiming) {
@@ -230,6 +247,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
+    if (!consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
         provider.trackTiming(category, variable, value, label);
@@ -240,11 +258,11 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track timing:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug]);
+  }, [providers, enabled, isInitialized, debug, config]);
 
   // Set user properties across all providers
   const setUserProperties = useCallback((properties: Record<string, any>) => {
-    if (!enabled || !isInitialized) return;
+    if (!enabled || !consentAllows('analytics')) return;
 
     // Call custom event handler if provided
     if (config.setUserProperties) {
@@ -258,6 +276,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
+    if (!consentAllows('marketing') || pixelEventProtectionActive()) return;
     providers.forEach(provider => {
       try {
         provider.setUserProperties(properties);
@@ -268,7 +287,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to set user properties:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug]);
+  }, [providers, enabled, isInitialized, debug, config]);
 
   const value: AnalyticsContextValue = {
     providers,
@@ -276,7 +295,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     trackPageView,
     trackTiming,
     setUserProperties,
-    isEnabled: enabled && isInitialized,
+    isEnabled: enabled && consentAllows('analytics') && (isInitialized || Boolean(config.trackEvent || config.trackPageView)),
     config
   };
 

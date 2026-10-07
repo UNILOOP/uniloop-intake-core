@@ -50,6 +50,7 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
   });
 
   const hasStartedRef = useRef(false);
+  const wasEnabledRef = useRef(false);
   const previousPageRef = useRef(currentPage);
   const previousBlockRef = useRef(currentBlockIndex);
   const fieldValuesRef = useRef<Record<string, any>>({});
@@ -57,13 +58,24 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
 
   // Track survey start and initial page view
   useEffect(() => {
-    if (!hasStartedRef.current && isEnabled) {
-      hasStartedRef.current = true;
-      trackSurveyStart({
+    if (!isEnabled) {
+      wasEnabledRef.current = false;
+      previousPageRef.current = currentPage;
+      previousBlockRef.current = currentBlockIndex;
+      return;
+    }
+    if (!wasEnabledRef.current) {
+      wasEnabledRef.current = true;
+      previousPageRef.current = currentPage;
+      previousBlockRef.current = currentBlockIndex;
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true;
+        trackSurveyStart({
         totalPages,
         surveyTitle: surveyData?.rootNode?.label || 'Survey',
         startTime: new Date().toISOString()
-      });
+        });
+      }
 
       // Track initial page view
       const pages = surveyData?.rootNode?.items || [];
@@ -80,7 +92,9 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
         pageTitle,
         totalPages,
         blockLabel,
-        surveyName
+        surveyName,
+        currentBlockIndex,
+        blocks.length
       );
     }
   }, [isEnabled, trackSurveyStart, trackPageView, totalPages, surveyData, currentPage, currentBlockIndex]);
@@ -118,10 +132,13 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
         pageTitle,
         totalPages,
         blockLabel,
-        surveyName
+        surveyName,
+        currentBlockIndex,
+        blocks.length
       );
 
       previousPageRef.current = currentPage;
+      previousBlockRef.current = currentBlockIndex;
     }
   }, [currentPage, isEnabled, trackNavigation, trackPageView, totalPages, surveyData, currentBlockIndex]);
 
@@ -134,6 +151,9 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
       const currentBlock = blocks[currentBlockIndex];
 
       if (currentBlock) {
+        const surveyName = surveyData?.rootNode?.label || 'Survey';
+        const blockLabel = currentBlock.label || currentPageData?.label || `Page ${currentPage + 1}`;
+        trackPageView(currentPage, currentPageData?.uuid || `page-${currentPage}`, `${surveyName} - ${blockLabel}`, totalPages, blockLabel, surveyName, currentBlockIndex, blocks.length);
         // Track block interaction
         trackFieldInteraction(
           currentBlock.uuid || `block-${currentBlockIndex}`,
@@ -146,7 +166,7 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
 
       previousBlockRef.current = currentBlockIndex;
     }
-  }, [currentBlockIndex, currentPage, isEnabled, trackFieldInteraction, surveyData]);
+  }, [currentBlockIndex, currentPage, isEnabled, trackFieldInteraction, trackPageView, totalPages, surveyData]);
 
   // Track field value changes
   useEffect(() => {

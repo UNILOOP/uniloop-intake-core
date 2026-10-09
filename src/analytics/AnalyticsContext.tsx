@@ -9,7 +9,7 @@ import { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
 import { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 import { MetaPixelProvider } from './providers/MetaPixelProvider';
 import { CustomPixelProvider } from './providers/CustomPixelProvider';
-import { pixelEventProtectionActive, pixelSafeEvent, pixelSafeMetadata } from './pixelPrivacy';
+import { pixelEventProtectionActive, pixelSafeEvent, pixelSafeMetadata, pixelSafeUrl } from './pixelPrivacy';
 // import './utils/debugHelpers'; // Import debug helpers to make them available
 
 function consentAllows(category: 'analytics' | 'marketing'): boolean {
@@ -221,7 +221,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     if (!consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
-        provider.trackPageView(pixelEventProtectionActive() ? window.location.origin + window.location.pathname : url, pixelEventProtectionActive() ? undefined : title, pixelSafeMetadata(additionalData));
+        provider.trackPageView(pixelEventProtectionActive() ? pixelSafeUrl(url) : url, pixelEventProtectionActive() ? undefined : title, pixelSafeMetadata(additionalData));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Page view tracked:`, { url, title, additionalData });
         }

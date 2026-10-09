@@ -13,9 +13,27 @@ export function pixelEventProtectionActive(): boolean {
     return typeof window !== 'undefined' && (window as Window & { UNILOOP_PIXEL_REQUIRED?: boolean }).UNILOOP_PIXEL_REQUIRED === true;
 }
 
-/** Keep structural journey facts; form responses and patient profiles never become marketing payloads. */
+export function pixelSafeUrl(value: string): string {
+    const url = new URL(value, window.location.href);
+    const attribution = url.search.slice(1).split('&').filter(parameter => {
+        try {
+            return decodeURIComponent(parameter.split('=')[0].replace(/\+/g, ' ')).toLowerCase().startsWith('utm_');
+        } catch {
+            return false;
+        }
+    });
+    return url.origin + url.pathname + (attribution.length ? '?' + attribution.join('&') : '');
+}
+
+function merchantMappingControlsApply(): boolean {
+    if (typeof window === 'undefined') return false;
+    const state = (window as Window & { UNILOOP_PIXEL_STATE?: { ready?: boolean; requires_consent?: boolean; consent?: { analytics?: boolean; marketing?: boolean } } }).UNILOOP_PIXEL_STATE;
+    return state?.ready === true && !state.requires_consent && state.consent?.analytics === true && state.consent?.marketing === true;
+}
+
+/** Without marketing consent retain only structural journey facts; otherwise channel mappings filter the canonical input. */
 export function pixelSafeMetadata(metadata?: Record<string, unknown>, monetary = false): Record<string, unknown> {
-    if (!pixelEventProtectionActive()) return metadata ?? {};
+    if (!pixelEventProtectionActive() || merchantMappingControlsApply()) return metadata ?? {};
     const safe: Record<string, unknown> = {};
     const fields = [
         'page_index',
@@ -59,7 +77,7 @@ export function pixelSafeMetadata(metadata?: Record<string, unknown>, monetary =
 }
 
 export function pixelSafeEvent<T extends { action: string; value?: unknown; metadata?: Record<string, unknown> }>(event: T): T {
-    if (!pixelEventProtectionActive()) return event;
+    if (!pixelEventProtectionActive() || merchantMappingControlsApply()) return event;
     const safe = { ...event, metadata: pixelSafeMetadata(event.metadata, monetaryActions.has(event.action)) };
     for (const key of ['label', 'user_id', 'userId', 'responses', 'properties']) delete (safe as Record<string, unknown>)[key];
     if (
@@ -74,7 +92,7 @@ export function pixelSafeEvent<T extends { action: string; value?: unknown; meta
 }
 
 export function pixelInternalMetadata(original: Record<string, unknown> | undefined, safe: Record<string, unknown>): Record<string, unknown> {
-    if (!pixelEventProtectionActive()) return original ?? {};
+    if (!pixelEventProtectionActive() || merchantMappingControlsApply()) return original ?? {};
     const internal = { ...safe };
     for (const key of ['treatment_id', 'enrollment_id']) {
         const value = original?.[key];

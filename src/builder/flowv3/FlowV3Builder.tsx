@@ -277,7 +277,11 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
 
         // Check if all options are covered by navigation rules pointing to non-sequential targets
         // If so, we don't need a fallback edge because every possible selection has a defined path
-        const allOptionsCovered = areAllOptionsCoveredByRules(block, nextBlockId);
+        const allOptionsCovered = areAllOptionsCoveredByRules(
+          block,
+          nextBlockId,
+          state.definitions.blocks[block.type]
+        );
 
         if (!hasDefaultRule && !hasRuleToNextBlock && !allOptionsCovered) {
            // Track edge index from this source for parallel offset
@@ -310,7 +314,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
 
     return { initialNodes: nodes, initialEdges: edges };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structuralKey, blocks, blocksMap]); // Only recompute when structure actually changes
+  }, [structuralKey, blocks, blocksMap, state.definitions.blocks]); // Only recompute when structure actually changes
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);

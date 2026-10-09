@@ -19,6 +19,7 @@ import { MatrixBlock } from "./MatrixBlock";
 import { RangeBlock } from "./RangeBlock";
 import { ScriptBlock } from "./ScriptBlock";
 import { SelectableBoxQuestionBlock } from "./SelectableBoxQuestionBlock";
+import { YesNoAnswerBlock } from "./YesNoAnswerBlock";
 // import { PatientBlock } from "./PatientBlock";
 import { BlockMountGuard } from "../hooks/useBlockOperation";
 
@@ -44,6 +45,7 @@ export const blockRegistry: Record<string, BlockDefinition> = {
   range: RangeBlock,
   script: ScriptBlock,
   selectablebox: SelectableBoxQuestionBlock,
+  yesNoAnswer: YesNoAnswerBlock,
 };
 
 // Export all standard block definitions - ALL NOW UNIFIED
@@ -52,6 +54,7 @@ export const StandardBlocks: BlockDefinition[] = [
   // PatientBlock,
   AgreementBlock,
   SelectableBoxQuestionBlock,
+  YesNoAnswerBlock,
   TextInputBlock,
   TextareaBlock,
   SelectBlock,
@@ -100,7 +103,8 @@ export {
   MatrixBlock,
   RangeBlock,
   ScriptBlock,
-  SelectableBoxQuestionBlock
+  SelectableBoxQuestionBlock,
+  YesNoAnswerBlock
 };
 
 // Cache for wrapped block definitions to avoid recreating on every call

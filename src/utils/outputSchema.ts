@@ -1,4 +1,10 @@
-import type { OutputSchema, BlockDefinition } from '../types';
+import type {
+  BlockData,
+  BlockDefinition,
+  OutputSchema,
+  OutputSchemaObject,
+  OutputSchemaOption,
+} from '../types';
 
 /**
  * Utility functions for working with block output schemas
@@ -74,6 +80,54 @@ export function resolveUnionSchema(
 
   // Return the schema at the mapped index, or first schema as fallback
   return schema.oneOf[schemaIndex] ?? schema.oneOf[0];
+}
+
+/**
+ * Get the object schema a block outputs, resolving union types
+ * @returns The object schema, or undefined when the block doesn't output an object
+ */
+function getObjectOutputSchema(
+  blockDefinition: BlockDefinition,
+  blockData?: BlockData
+): OutputSchemaObject | undefined {
+  const schema = blockDefinition.outputSchema;
+  if (!schema) return undefined;
+
+  const resolved = 'oneOf' in schema ? resolveUnionSchema(schema, blockData) : schema;
+  return resolved && 'type' in resolved && resolved.type === 'object' ? resolved : undefined;
+}
+
+/**
+ * Get the output keys that rules can test, leaving out properties marked `excludeFromRules`
+ * @param blockDefinition The block definition
+ * @param blockData Optional block configuration data (for resolving union types)
+ * @returns Array of keys to offer as `fieldName.<key>` in rule editors
+ */
+export function getRuleOutputKeys(
+  blockDefinition: BlockDefinition,
+  blockData?: BlockData
+): string[] {
+  const schema = getObjectOutputSchema(blockDefinition, blockData);
+  if (!schema) return [];
+
+  return Object.entries(schema.properties)
+    .filter(([, property]) => !property.excludeFromRules)
+    .map(([key]) => key);
+}
+
+/**
+ * Get the fixed options an output property lists, for rule value dropdowns
+ * @param blockDefinition The block definition
+ * @param blockData Block configuration data (for resolving union types)
+ * @param key The property key
+ * @returns The property's options, or an empty array when it lists none
+ */
+export function getOutputPropertyOptions(
+  blockDefinition: BlockDefinition,
+  blockData: BlockData,
+  key: string
+): OutputSchemaOption[] {
+  return getObjectOutputSchema(blockDefinition, blockData)?.properties[key]?.options ?? [];
 }
 
 /**

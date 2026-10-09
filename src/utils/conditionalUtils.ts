@@ -7,7 +7,8 @@ import type {
   CurrentValues,
   EvaluationResult,
 } from '../types';
-import type { BlockData } from '../types';
+import type { BlockData, BlockDefinition } from '../types';
+import { getOutputPropertyOptions, getRuleOutputKeys } from './outputSchema';
 
 /**
  * Evaluates a simple condition between two values using the specified operator
@@ -883,10 +884,12 @@ export function calculateBMI(
 /**
  * Gets the navigation target for a specific option value by evaluating navigation rules
  * Returns the target UUID if a rule matches, or null if no rule matches
+ * @param key - For an object output, the property the option belongs to
  */
 export function getNavigationTargetForOption(
   block: BlockData,
-  optionValue: string
+  optionValue: string,
+  key?: string
 ): string | null {
   if (!block.navigationRules || block.navigationRules.length === 0) {
     return null;
@@ -896,9 +899,9 @@ export function getNavigationTargetForOption(
   if (!fieldName) return null;
 
   // Create simulated currentValues with the option value
-  const simulatedValues: CurrentValues = {
-    [fieldName]: optionValue
-  };
+  const simulatedValues = {
+    [fieldName]: key ? { [key]: optionValue } : optionValue
+  } as CurrentValues;
 
   // Evaluate each navigation rule
   for (const rule of block.navigationRules) {
@@ -932,21 +935,19 @@ export function getNavigationTargetForOption(
 /**
  * Checks if all options in a block with options (like selectablebox) are covered
  * by navigation rules that point to non-sequential targets.
+ * Blocks without their own options are checked against the options their output
+ * schema lists for a property (like a Yes/No `answer`), when the definition is given.
  *
  * @param block - The block to check
  * @param sequentialTargetId - The next block in sequential order (or "submit")
+ * @param blockDefinition - The block's definition, for options listed in its output schema
  * @returns true if ALL options are covered by rules pointing to different targets than sequential
  */
 export function areAllOptionsCoveredByRules(
   block: BlockData,
-  sequentialTargetId: string
+  sequentialTargetId: string,
+  blockDefinition?: BlockDefinition
 ): boolean {
-  // Check if block has options
-  const options = block.options;
-  if (!Array.isArray(options) || options.length === 0) {
-    return false;
-  }
-
   // Check if block has navigation rules
   if (!block.navigationRules || block.navigationRules.length === 0) {
     return false;
@@ -954,22 +955,41 @@ export function areAllOptionsCoveredByRules(
 
   // For each option, check if there's a navigation rule that matches
   // and points to a target different from the sequential target
-  for (const option of options) {
-    const optionValue = option.value;
-    if (optionValue === undefined || optionValue === null) {
-      // Option without value - can't be evaluated
-      return false;
+  const coversAll = (optionValues: unknown[], key?: string): boolean => {
+    if (optionValues.length === 0) return false;
+
+    for (const optionValue of optionValues) {
+      if (optionValue === undefined || optionValue === null) {
+        // Option without value - can't be evaluated
+        return false;
+      }
+
+      const target = getNavigationTargetForOption(block, String(optionValue), key);
+
+      // If no rule matches this option, or the rule points to sequential target,
+      // we still need the fallback edge
+      if (!target || target === sequentialTargetId) {
+        return false;
+      }
     }
 
-    const target = getNavigationTargetForOption(block, String(optionValue));
+    // All options are covered by rules pointing to non-sequential targets
+    return true;
+  };
 
-    // If no rule matches this option, or the rule points to sequential target,
-    // we still need the fallback edge
-    if (!target || target === sequentialTargetId) {
-      return false;
-    }
+  // Check if block has options
+  const options = block.options;
+  if (Array.isArray(options) && options.length > 0) {
+    return coversAll(options.map((option) => option.value));
   }
 
-  // All options are covered by rules pointing to non-sequential targets
-  return true;
+  // Otherwise, one output property whose options are all covered is enough
+  if (!blockDefinition) return false;
+
+  return getRuleOutputKeys(blockDefinition, block).some((key) =>
+    coversAll(
+      getOutputPropertyOptions(blockDefinition, block, key).map((option) => option.value),
+      key
+    )
+  );
 }

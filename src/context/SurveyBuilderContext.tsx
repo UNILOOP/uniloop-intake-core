@@ -14,7 +14,7 @@ import {
   type SurveyMode
 } from "../types";
 import { uniloop as uniTheme } from "../themes";
-import { getOutputKeys, isObjectOutput } from "../utils/outputSchema";
+import { getRuleOutputKeys, isObjectOutput } from "../utils/outputSchema";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
 // Custom hook
@@ -638,7 +638,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         if (blockDefinition && item.fieldName) {
           // Check if block outputs an object (which may have nested fields)
           if (isObjectOutput(blockDefinition, item)) {
-            const outputKeys = getOutputKeys(blockDefinition, item);
+            const outputKeys = getRuleOutputKeys(blockDefinition, item);
             // Add nested field accessors (e.g., "authResults.email")
             for (const key of outputKeys) {
               names.push(`${item.fieldName}.${key}`);
@@ -717,7 +717,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         const blockDefinition = state.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getOutputKeys(blockDefinition, node);
+            const outputKeys = getRuleOutputKeys(blockDefinition, node);
             for (const key of outputKeys) {
               fieldNames.push(`${node.fieldName}.${key}`);
             }
@@ -775,7 +775,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         const blockDefinition = state.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getOutputKeys(blockDefinition, node);
+            const outputKeys = getRuleOutputKeys(blockDefinition, node);
             for (const key of outputKeys) {
               fieldNames.push(`${node.fieldName}.${key}`);
             }
@@ -829,7 +829,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         const blockDefinition = state.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getOutputKeys(blockDefinition, node);
+            const outputKeys = getRuleOutputKeys(blockDefinition, node);
             for (const key of outputKeys) {
               fieldNames.push(`${node.fieldName}.${key}`);
             }

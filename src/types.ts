@@ -46,12 +46,22 @@ export type OutputSchemaArray = {
   };
 };
 
+// A fixed value an output property can take
+export type OutputSchemaOption = {
+  label: string;
+  value: string;
+};
+
 export type OutputSchemaObject = {
   type: 'object';
   properties: Record<string, {
     type: 'string' | 'number' | 'boolean' | 'date' | 'object' | 'array';
     optional?: boolean;
     description?: string;
+    // Rule editors show these as a dropdown for `fieldName.<key>`
+    options?: OutputSchemaOption[];
+    // Leaves `fieldName.<key>` out of the fields that rules can test
+    excludeFromRules?: boolean;
   }>;
 };
 

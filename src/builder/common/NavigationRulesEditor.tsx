@@ -14,6 +14,7 @@ import {
 import { useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import type { BlockData, NavigationRule } from "../../types";
 import { NavigationRuleValueInput } from "./NavigationRuleValueInput";
+import { getOutputPropertyOptions } from "../../utils/outputSchema";
 import {
   OPERATORS,
   enhancedRuleToStandard,
@@ -127,6 +128,22 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
 
     return [];
   }, []);
+
+  // Options for a rule's field: the block's own options, or for `fieldName.<key>`
+  // the options its output schema lists for that key
+  const getFieldOptions = React.useCallback((field: string): Array<{ label: string; value: string }> => {
+    const block = findBlockByFieldName(field);
+    if (block) return getBlockOptions(block);
+
+    const dot = field.indexOf(".");
+    if (dot === -1) return [];
+
+    const parent = findBlockByFieldName(field.slice(0, dot));
+    const definition = parent ? state.definitions?.blocks?.[parent.type] : undefined;
+    if (!parent || !definition) return [];
+
+    return getOutputPropertyOptions(definition, parent, field.slice(dot + 1));
+  }, [findBlockByFieldName, getBlockOptions, state.definitions?.blocks]);
 
   const findBlockPath = React.useCallback((node: any, targetUuid: string, currentPath: any[] = []): any[] | null => {
     if (!node) return null;
@@ -554,7 +571,7 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
                   operator={OPERATORS.find(op => op.value === rule.operator) || OPERATORS[0]}
                   availableVariables={fieldOptions}
                   fieldType={data.type === 'number' ? 'number' : 'text'}
-                  fieldOptions={getBlockOptions(findBlockByFieldName(rule.field))}
+                  fieldOptions={getFieldOptions(rule.field)}
                 />
               </div>
             </div>
@@ -723,7 +740,7 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
                 operator={OPERATORS.find(op => op.value === rule.operator) || OPERATORS[0]}
                 availableVariables={fieldOptions}
                 fieldType={data.type === 'number' ? 'number' : 'text'}
-                fieldOptions={getBlockOptions(findBlockByFieldName(rule.field))}
+                fieldOptions={getFieldOptions(rule.field)}
               />
             </div>
           </div>
@@ -781,7 +798,7 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
           )}
         </div>
     );
-  }, [fieldOptions, pageOptions, blockOptions, handleRuleChange, handleTargetChange, removeRule, data.type, findBlockByFieldName, getBlockOptions, hideRemoveButton]);
+  }, [fieldOptions, pageOptions, blockOptions, handleRuleChange, handleTargetChange, removeRule, data.type, getFieldOptions, hideRemoveButton]);
 
   // Don't render the editor if there's only one page or one block
   if (!shouldShowEditor) {

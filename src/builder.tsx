@@ -44,6 +44,7 @@ export {
   RangeBlock,
   ScriptBlock,
   SelectableBoxQuestionBlock,
+  YesNoAnswerBlock,
   AgreementBlock
 } from './blocks';
 

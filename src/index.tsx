@@ -154,6 +154,7 @@ export type {
   OutputSchemaScalar,
   OutputSchemaArray,
   OutputSchemaObject,
+  OutputSchemaOption,
   OutputSchemaUnion,
 
   // Node types

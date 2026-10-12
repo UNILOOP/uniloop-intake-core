@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup src/index.tsx --format cjs,esm --dts --watch",
-    "lint": "biome lint ."
+    "lint": "biome lint .",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "react",
@@ -74,7 +75,10 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@tailwindcss/postcss": "^4.1.16",
     "@types/howler": "^2.2.12",
+    "@types/node": "^20.19.24",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "postcss": "^8.4.32",

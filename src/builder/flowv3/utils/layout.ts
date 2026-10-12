@@ -3,12 +3,17 @@ import { Node, Edge, Position } from "@xyflow/react";
 const defaultWidth = 400;
 const defaultHeight = 150;
 
+type Dagre = typeof import("@dagrejs/dagre");
+
 // Lazy-loaded dagre instance to avoid SSR issues
-let dagreInstance: typeof import("@dagrejs/dagre") | null = null;
+let dagreInstance: Dagre | null = null;
 
 async function getDagre() {
   if (!dagreInstance) {
-    dagreInstance = await import("@dagrejs/dagre");
+    // dagre 2's ESM build only has a default export, although its types declare
+    // named ones. Its CommonJS build puts everything on the module itself.
+    const dagreModule = (await import("@dagrejs/dagre")) as Dagre & { default?: Dagre };
+    dagreInstance = dagreModule.default ?? dagreModule;
   }
   return dagreInstance;
 }

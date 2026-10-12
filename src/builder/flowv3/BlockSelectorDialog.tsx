@@ -8,6 +8,11 @@ interface BlockSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (blockType: string) => void;
+  /** Limits the list to these block types. Lists every block when omitted. */
+  blockTypes?: string[];
+  title?: string;
+  /** Shown above the list */
+  description?: React.ReactNode;
 }
 
 // Memoized block item component to prevent re-renders
@@ -53,12 +58,19 @@ const BlockSelectorDialogInner: React.FC<BlockSelectorDialogProps> = ({
   open,
   onOpenChange,
   onSelect,
+  blockTypes,
+  title = "Select Block Type",
+  description,
 }) => {
   const { state } = useSurveyBuilder();
 
-  // Memoize block filtering - only recalculate when definitions change
+  // Memoize block filtering - only recalculate when definitions or the allowed types change
   const { defaultBlocks, customBlocks, hasCustomBlocks } = useMemo(() => {
-    const defaultBlocks = Object.entries(state.definitions.blocks).filter(
+    const blocks = Object.entries(state.definitions.blocks).filter(
+      ([type]) => !blockTypes || blockTypes.includes(type)
+    );
+
+    const defaultBlocks = blocks.filter(
       ([_, definition]) => {
         const defaultData = definition.generateDefaultData
           ? definition.generateDefaultData()
@@ -67,7 +79,7 @@ const BlockSelectorDialogInner: React.FC<BlockSelectorDialogProps> = ({
       }
     );
 
-    const customBlocks = Object.entries(state.definitions.blocks).filter(
+    const customBlocks = blocks.filter(
       ([_, definition]) => {
         const defaultData = definition.generateDefaultData
           ? definition.generateDefaultData()
@@ -81,7 +93,7 @@ const BlockSelectorDialogInner: React.FC<BlockSelectorDialogProps> = ({
       customBlocks,
       hasCustomBlocks: customBlocks.length > 0
     };
-  }, [state.definitions.blocks]);
+  }, [state.definitions.blocks, blockTypes]);
 
   // Stable render function using memoized component
   const renderBlockItem = useCallback(([type, definition]: [string, any]) => (
@@ -92,12 +104,20 @@ const BlockSelectorDialogInner: React.FC<BlockSelectorDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Select Block Type</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        
+
+        {description && (
+          <div className="text-sm text-slate-500 dark:text-slate-400">{description}</div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-1">
-          {hasCustomBlocks ? (
-            <Tabs defaultValue="default" className="w-full">
+          {defaultBlocks.length === 0 && !hasCustomBlocks ? (
+            <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              No blocks to choose from.
+            </div>
+          ) : hasCustomBlocks ? (
+            <Tabs defaultValue={defaultBlocks.length > 0 ? "default" : "custom"} className="w-full">
               <TabsList className="w-full mb-4 grid grid-cols-2">
                 <TabsTrigger value="default">Standard Blocks</TabsTrigger>
                 <TabsTrigger value="custom">Custom Blocks</TabsTrigger>

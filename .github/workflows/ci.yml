@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      # main already has lint errors, so only fail when a changed file ends up
+      # with more errors than it had before the change.
+      - name: Lint changed files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          base=$(git merge-base "$BASE_SHA" HEAD 2>/dev/null || git rev-parse HEAD~1)
+          git worktree add --quiet --detach "$RUNNER_TEMP/base" "$base"
+          cp biome.json "$RUNNER_TEMP/base/biome.json"
+          biome="$PWD/node_modules/.bin/biome"
+          errors() {
+            "$biome" lint --reporter=github --max-diagnostics=none --no-errors-on-unmatched "$1" 2>/dev/null | grep -c '^::error' || true
+          }
+          failed=0
+          while IFS=$'\t' read -r change old new; do
+            new=${new:-$old}
+            after=$(errors "$new")
+            before=0
+            if [[ $change != A ]]; then before=$(cd "$RUNNER_TEMP/base" && errors "$old"); fi
+            if (( after > before )); then
+              echo "::error file=$new::Lint errors in this file went from $before to $after"
+              "$biome" lint --max-diagnostics=none "$new" || true
+              failed=1
+            fi
+          done < <(git diff --name-status --diff-filter=AMR "$base" HEAD)
+          exit $failed

@@ -2933,24 +2933,29 @@ const registrationSurvey = {
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Run linting: `npm run lint`
+4. Run `bun run typecheck` and `bun run build`
 5. Commit your changes
 6. Push to the branch and open a Pull Request
+
+CI runs on every pull request and push to `main`. It installs from `bun.lock`, type checks, builds, and fails if a changed file ends up with more lint errors than it had before.
 
 ### Development Setup
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Start development mode
-npm run dev
+bun run dev
+
+# Type check
+bun run typecheck
 
 # Build package
-npm run build
+bun run build
 
 # Run linter
-npm run lint
+bun run lint
 ```
 
 ## Acknowledgments

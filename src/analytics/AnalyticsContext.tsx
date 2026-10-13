@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import type React from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type {
   AnalyticsConfig,
   AnalyticsContextValue,
@@ -19,6 +20,15 @@ function consentAllows(category: 'necessary' | 'preferences' | 'analytics' | 'ma
   return win.UNILOOP_PIXEL_STATE?.ready === true && win.UNILOOP_PIXEL_STATE.requires_consent !== true && win.UNILOOP_PIXEL_STATE.consent?.[category] === true;
 }
 
+function readConsentPermissions() {
+  return {
+    necessary: true,
+    preferences: consentAllows('preferences'),
+    analytics: consentAllows('analytics'),
+    marketing: consentAllows('marketing')
+  };
+}
+
 const AnalyticsContext = createContext<AnalyticsContextValue | undefined>(undefined);
 
 export interface SurveyAnalyticsProviderProps {
@@ -37,17 +47,17 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
   const [providers, setProviders] = useState<AnalyticsProvider[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
-  const [consentRevision, setConsentRevision] = useState(0);
+  const [consentPermissions, setConsentPermissions] = useState(readConsentPermissions());
 
   useEffect(() => {
-    const refreshConsent = () => setConsentRevision(revision => revision + 1);
+    const refreshConsent = () => setConsentPermissions(readConsentPermissions());
     window.addEventListener('uniloop:consent', refreshConsent);
     return () => window.removeEventListener('uniloop:consent', refreshConsent);
   }, []);
 
   // Initialize analytics providers
   useEffect(() => {
-    if (!enabled || !consentAllows('marketing')) {
+    if (!enabled || !consentPermissions.marketing) {
       if (debug) {
         console.log('[Analytics] Analytics disabled');
       }
@@ -61,9 +71,9 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       return;
     }
 
+    const activeProviders: AnalyticsProvider[] = [];
     const initializeProviders = async () => {
       initializingRef.current = true;
-      const activeProviders: AnalyticsProvider[] = [];
 
       if (debug) {
         console.log('[Analytics] Starting provider initialization with config:', config);
@@ -165,20 +175,20 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
     // Cleanup function
     return () => {
-      providers.forEach(provider => {
+      activeProviders.forEach(provider => {
         if (provider.destroy) {
           provider.destroy();
         }
       });
     };
-  }, [config, enabled, debug, consentRevision]);
+  }, [config, enabled, debug, consentPermissions.marketing]);
 
-  const eventAllowed = (action: string): boolean => {
+  const eventAllowed = useCallback((action: string): boolean => {
     const channels = config.eventMappings?.events?.[action] ?? {};
-    if (consentAllows('analytics')) return true;
-    return (config.eventMappings?.collection_consent?.[action] ?? []).some(consentAllows)
-      || Object.values(channels).some(mapping => mapping.enabled !== false && mapping.consent_category != null && consentAllows(mapping.consent_category));
-  };
+    if (consentPermissions.analytics && consentAllows('analytics')) return true;
+    return (config.eventMappings?.collection_consent?.[action] ?? []).some(category => consentPermissions[category] && consentAllows(category))
+      || Object.values(channels).some(mapping => mapping.enabled !== false && mapping.consent_category != null && consentPermissions[mapping.consent_category] && consentAllows(mapping.consent_category));
+  }, [config.eventMappings, consentPermissions]);
 
   // Track event across all providers
   const trackEvent = useCallback((event: SurveyAnalyticsEvent) => {
@@ -207,7 +217,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track event:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug, config]);
+  }, [providers, enabled, debug, config, eventAllowed]);
 
   // Track page view across all providers
   const trackPageView = useCallback((url: string, title?: string, additionalData?: Record<string, any>) => {
@@ -236,7 +246,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track page view:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug, config]);
+  }, [providers, enabled, debug, config, eventAllowed]);
 
   // Track timing across all providers
   const trackTiming = useCallback((category: string, variable: string, value: number, label?: string) => {
@@ -265,7 +275,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track timing:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug, config]);
+  }, [providers, enabled, debug, config, eventAllowed]);
 
   // Set user properties across all providers
   const setUserProperties = useCallback((properties: Record<string, any>) => {
@@ -294,7 +304,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to set user properties:`, error);
       }
     });
-  }, [providers, enabled, isInitialized, debug, config]);
+  }, [providers, enabled, debug, config, eventAllowed]);
 
   const value: AnalyticsContextValue = {
     providers,

@@ -32,8 +32,8 @@ function merchantMappingControlsApply(): boolean {
 }
 
 /** Without marketing consent retain only structural journey facts; otherwise channel mappings filter the canonical input. */
-export function pixelSafeMetadata(metadata?: Record<string, unknown>, monetary = false): Record<string, unknown> {
-    if (!pixelEventProtectionActive() || merchantMappingControlsApply()) return metadata ?? {};
+export function pixelSafeMetadata(metadata?: Record<string, unknown>, monetary = false, allowMerchantMappings = true): Record<string, unknown> {
+    if (!pixelEventProtectionActive() || (allowMerchantMappings && merchantMappingControlsApply())) return metadata ?? {};
     const safe: Record<string, unknown> = {};
     const fields = [
         'page_index',
@@ -76,9 +76,9 @@ export function pixelSafeMetadata(metadata?: Record<string, unknown>, monetary =
     return safe;
 }
 
-export function pixelSafeEvent<T extends { action: string; value?: unknown; metadata?: Record<string, unknown> }>(event: T): T {
-    if (!pixelEventProtectionActive() || merchantMappingControlsApply()) return event;
-    const safe = { ...event, metadata: pixelSafeMetadata(event.metadata, monetaryActions.has(event.action)) };
+export function pixelSafeEvent<T extends { action: string; value?: unknown; metadata?: Record<string, unknown> }>(event: T, allowMerchantMappings = true): T {
+    if (!pixelEventProtectionActive() || (allowMerchantMappings && merchantMappingControlsApply())) return event;
+    const safe = { ...event, metadata: pixelSafeMetadata(event.metadata, monetaryActions.has(event.action), allowMerchantMappings) };
     for (const key of ['label', 'user_id', 'userId', 'responses', 'properties']) delete (safe as Record<string, unknown>)[key];
     if (
         !monetaryActions.has(event.action) ||

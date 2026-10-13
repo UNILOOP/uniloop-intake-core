@@ -12,8 +12,8 @@ import { CustomPixelProvider } from './providers/CustomPixelProvider';
 import { pixelEventProtectionActive, pixelSafeEvent, pixelSafeMetadata, pixelSafeUrl } from './pixelPrivacy';
 // import './utils/debugHelpers'; // Import debug helpers to make them available
 
-function consentAllows(category: 'analytics' | 'marketing'): boolean {
-  if (typeof window === 'undefined') return true;
+function consentAllows(category: 'necessary' | 'preferences' | 'analytics' | 'marketing'): boolean {
+  if (category === 'necessary' || typeof window === 'undefined') return true;
   const win = window as unknown as { UNILOOP_PIXEL_REQUIRED?: boolean; UNILOOP_PIXEL_STATE?: { ready?: boolean; requires_consent?: boolean; consent?: Record<string, boolean> } };
   if (!win.UNILOOP_PIXEL_REQUIRED) return true;
   return win.UNILOOP_PIXEL_STATE?.ready === true && win.UNILOOP_PIXEL_STATE.requires_consent !== true && win.UNILOOP_PIXEL_STATE.consent?.[category] === true;
@@ -173,9 +173,16 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     };
   }, [config, enabled, debug, consentRevision]);
 
+  const eventAllowed = (action: string): boolean => {
+    const channels = config.eventMappings?.events?.[action] ?? {};
+    if (consentAllows('analytics')) return true;
+    return (config.eventMappings?.collection_consent?.[action] ?? []).some(consentAllows)
+      || Object.values(channels).some(mapping => mapping.enabled !== false && mapping.consent_category != null && consentAllows(mapping.consent_category));
+  };
+
   // Track event across all providers
   const trackEvent = useCallback((event: SurveyAnalyticsEvent) => {
-    if (!enabled || !consentAllows('analytics')) return;
+    if (!enabled || !eventAllowed(event.action)) return;
 
     // Call custom event handler if provided
     if (config.trackEvent) {
@@ -189,10 +196,10 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('marketing')) return;
+    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
-        provider.trackEvent(pixelSafeEvent(event));
+        provider.trackEvent(pixelSafeEvent(event, provider !== config.custom?.handler));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Event tracked:`, event);
         }
@@ -204,7 +211,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Track page view across all providers
   const trackPageView = useCallback((url: string, title?: string, additionalData?: Record<string, any>) => {
-    if (!enabled || !consentAllows('analytics')) return;
+    if (!enabled || !eventAllowed('page_view')) return;
 
     // Call custom event handler if provided
     if (config.trackPageView) {
@@ -218,7 +225,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('marketing')) return;
+    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
         provider.trackPageView(pixelEventProtectionActive() ? pixelSafeUrl(url) : url, pixelEventProtectionActive() ? undefined : title, pixelSafeMetadata(additionalData));
@@ -233,7 +240,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Track timing across all providers
   const trackTiming = useCallback((category: string, variable: string, value: number, label?: string) => {
-    if (!enabled || !consentAllows('analytics')) return;
+    if (!enabled || !eventAllowed('timing')) return;
 
     // Call custom event handler if provided
     if (config.trackTiming) {
@@ -247,7 +254,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('marketing')) return;
+    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
       try {
         provider.trackTiming(category, variable, value, label);
@@ -262,7 +269,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Set user properties across all providers
   const setUserProperties = useCallback((properties: Record<string, any>) => {
-    if (!enabled || !consentAllows('analytics')) return;
+    if (!enabled || !eventAllowed('set_properties')) return;
 
     // Call custom event handler if provided
     if (config.setUserProperties) {
@@ -276,7 +283,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('marketing') || pixelEventProtectionActive()) return;
+    if (!consentAllows('analytics') || !consentAllows('marketing') || pixelEventProtectionActive()) return;
     providers.forEach(provider => {
       try {
         provider.setUserProperties(properties);
@@ -295,7 +302,10 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     trackPageView,
     trackTiming,
     setUserProperties,
-    isEnabled: enabled && consentAllows('analytics') && (isInitialized || Boolean(config.trackEvent || config.trackPageView)),
+    isEnabled: enabled && (consentAllows('analytics')
+      || Object.keys(config.eventMappings?.events ?? {}).some(eventAllowed)
+      || Object.keys(config.eventMappings?.collection_consent ?? {}).some(eventAllowed))
+      && (isInitialized || Boolean(config.trackEvent || config.trackPageView)),
     config
   };
 

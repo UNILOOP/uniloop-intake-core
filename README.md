@@ -940,6 +940,7 @@ const customTheme: ThemeDefinition = {
     border: "#E5E7EB",
     error: "#EF4444",
     success: "#10B981",
+    placeholder: "#9CA3AF", // optional; placeholder text in empty fields
   },
 };
 
@@ -1069,6 +1070,7 @@ interface ThemeDefinition {
     border: string;
     error: string;
     success: string;
+    placeholder?: string; // unset keeps placeholders on the muted text colour
   };
   fonts?: {
     urls?: string[];

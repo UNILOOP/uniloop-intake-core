@@ -148,7 +148,14 @@
 
 .survey-isolated-content input::placeholder,
 .survey-isolated-content textarea::placeholder {
-  color: var(--survey-text-muted);
+  color: var(--survey-placeholder, var(--survey-text-muted));
+}
+
+/* An empty select's text (Radix marks the trigger with data-placeholder) takes
+   the theme's placeholder colour only when the theme sets one; the chevron
+   keeps the trigger's colour */
+.survey-isolated-content.survey-placeholder-themed [data-placeholder] > span {
+  color: var(--survey-placeholder);
 }
 
 /* Button Styling with Theme Colors */

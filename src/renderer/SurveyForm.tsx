@@ -188,6 +188,8 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
         '--survey-text-muted': isDarkMode
           ? 'oklch(0.705 0.015 286.067)'
           : 'oklch(0.552 0.016 285.938)',
+        // Unset keeps placeholders on the muted text colour (see survey-theme-isolation.css)
+        '--survey-placeholder': themeConfig.colors.placeholder || undefined,
         '--survey-input': isDarkMode
           ? 'oklch(1 0 0 / 18%)'
           : 'oklch(0.96 0.002 286.32)',
@@ -353,7 +355,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
           </Select>
         </div>
       )}
-      <div className="survey-isolated-content flex-1 flex flex-col min-h-screen">
+      <div
+        className={`survey-isolated-content ${themeConfig.colors.placeholder ? 'survey-placeholder-themed ' : ''}flex-1 flex flex-col min-h-screen`}
+      >
         <div
           className={`${containerClass} ${themeConfig.background} flex flex-col flex-1 min-h-screen`}
         >

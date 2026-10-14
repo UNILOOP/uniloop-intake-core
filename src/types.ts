@@ -260,6 +260,7 @@ export interface ThemeDefinition {
     border: string;
     error: string;
     success: string;
+    placeholder?: string; // Placeholder text in empty fields; unset keeps the muted text colour
   };
   fonts?: {
     // CDN URLs for loading custom fonts (e.g., Google Fonts, Adobe Fonts, etc.)

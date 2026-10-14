@@ -1636,7 +1636,10 @@ export const ThemeBuilder: React.FC<ThemeBuilderProps> = ({onDataChange, customT
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {Object.entries(currentTheme.colors).map(([key, value]) => (
+                      {Object.entries({
+                        ...currentTheme.colors,
+                        placeholder: currentTheme.colors.placeholder || '',
+                      }).map(([key, value]) => (
                         <div key={key} className="space-y-2">
                           <Label className="capitalize flex items-center gap-2">
                             {key}
@@ -1653,6 +1656,7 @@ export const ThemeBuilder: React.FC<ThemeBuilderProps> = ({onDataChange, customT
                                 {key === 'border' && "Default border color"}
                                 {key === 'error' && "Color for error messages"}
                                 {key === 'success' && "Color for success messages"}
+                                {key === 'placeholder' && "Placeholder text in empty fields. Leave empty to keep the muted text color"}
                               </PopoverContent>
                             </Popover>
                           </Label>
@@ -1662,10 +1666,10 @@ export const ThemeBuilder: React.FC<ThemeBuilderProps> = ({onDataChange, customT
                                 variant="outline"
                                 className="w-full h-12 justify-between"
                               >
-                                <span className="text-sm font-mono">{value}</span>
+                                <span className="text-sm font-mono">{value || 'Default'}</span>
                                 <div 
                                   className="w-8 h-8 rounded border"
-                                  style={{ backgroundColor: value }}
+                                  style={{ backgroundColor: value || undefined }}
                                 />
                               </Button>
                             </PopoverTrigger>
@@ -1690,7 +1694,7 @@ export const ThemeBuilder: React.FC<ThemeBuilderProps> = ({onDataChange, customT
                                   <div className="flex gap-2 mt-2">
                                     <input
                                       type="color"
-                                      value={value}
+                                      value={value || '#71717b'}
                                       onChange={(e) => updateNestedProperty('colors', key, e.target.value)}
                                       className="w-20 h-10 rounded cursor-pointer"
                                     />

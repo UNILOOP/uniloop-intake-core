@@ -32,6 +32,7 @@ import { FlowV2Toolbar } from "./FlowV2Toolbar";
 import type { FlowV2Mode } from "./types";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import { BlockSelectorDialog } from "./BlockSelectorDialog";
+import { ReplaceBlockDialog } from "../common/ReplaceBlockDialog";
 import { getHumanReadableCondition } from "./utils/conditionLabel";
 import { areAllOptionsCoveredByRules } from "../../utils/conditionalUtils";
 import { Button } from "../../components/ui/button";
@@ -71,6 +72,9 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
   // Block Selector State
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [branchSourceId, setBranchSourceId] = useState<string | null>(null);
+
+  // Block whose Replace button was clicked
+  const [replaceBlockUuid, setReplaceBlockUuid] = useState<string | null>(null);
 
   // Track if we are waiting for a layout update
   const [needsLayout, setNeedsLayout] = useState(false);
@@ -639,6 +643,13 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       setShowBlockSelector(true);
     };
 
+    const handleReplaceEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ blockUuid?: string }>;
+      if (customEvent.detail?.blockUuid) {
+        setReplaceBlockUuid(customEvent.detail.blockUuid);
+      }
+    };
+
     // NEW: Handle block updates from SurveyNode (avoids state.rootNode dependency in node)
     const handleUpdateBlock = (e: Event) => {
       const customEvent = e as CustomEvent<{ blockUuid: string; data: BlockData }>;
@@ -716,6 +727,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
     window.addEventListener('flow-v3-configure-node', handleConfigEvent);
     window.addEventListener('flow-v3-add-block', handleAddBlock);
     window.addEventListener('flow-v3-add-branch', handleAddBranch);
+    window.addEventListener('flow-v3-replace-block', handleReplaceEvent);
     window.addEventListener('flow-v3-update-block', handleUpdateBlock);
     window.addEventListener('flow-v3-reconnect-edge', handleReconnectEdge);
 
@@ -726,11 +738,34 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       window.removeEventListener('flow-v3-configure-node', handleConfigEvent);
       window.removeEventListener('flow-v3-add-block', handleAddBlock);
       window.removeEventListener('flow-v3-add-branch', handleAddBranch);
+      window.removeEventListener('flow-v3-replace-block', handleReplaceEvent);
       window.removeEventListener('flow-v3-update-block', handleUpdateBlock);
       window.removeEventListener('flow-v3-reconnect-edge', handleReconnectEdge);
     };
   }, []); // Empty deps - listeners are stable, use refs for current values
 
+
+  const replaceTarget = useMemo(
+    () =>
+      replaceBlockUuid
+        ? (state.rootNode?.items as BlockData[] | undefined)?.find((b) => b.uuid === replaceBlockUuid)
+        : undefined,
+    [replaceBlockUuid, state.rootNode]
+  );
+
+  const handleBlockReplace = useCallback(
+    (data: BlockData) => {
+      if (!state.rootNode || !replaceBlockUuid) return;
+
+      updateNode(state.rootNode.uuid!, {
+        ...state.rootNode,
+        items: (state.rootNode.items || []).map((item) =>
+          (item as BlockData).uuid === replaceBlockUuid ? data : item
+        ),
+      });
+    },
+    [state.rootNode, replaceBlockUuid, updateNode]
+  );
 
   const handleResetLayout = useCallback(() => {
     setNeedsLayout(true);
@@ -1481,6 +1516,17 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         onOpenChange={setShowBlockSelector}
         onSelect={handleBlockSelect}
       />
+
+      {replaceTarget && (
+        <ReplaceBlockDialog
+          block={replaceTarget}
+          open
+          onOpenChange={(open) => {
+            if (!open) setReplaceBlockUuid(null);
+          }}
+          onReplace={handleBlockReplace}
+        />
+      )}
     </div>
     </BlocksMapProvider>
   );

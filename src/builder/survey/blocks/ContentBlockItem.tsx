@@ -9,6 +9,7 @@ import { BlockData } from "../../../types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 import {CommonBlockRules} from "../../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
+import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
 import { PieChart } from "lucide-react";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
@@ -29,6 +30,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
 }) => {
   const { state } = useSurveyBuilder();
   const [isEditing, setIsEditing] = useState(false);
+  const [isReplacing, setIsReplacing] = useState(false);
   const blockDefinition = state.definitions.blocks[data.type];
 
   if (!blockDefinition) {
@@ -113,6 +115,20 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsReplacing(true)}
+          >
+            Replace
+          </Button>
+          <ReplaceBlockDialog
+            block={data}
+            open={isReplacing}
+            onOpenChange={setIsReplacing}
+            onReplace={onUpdate}
+          />
 
           <Button type="button"
             variant="outline"

@@ -4,7 +4,7 @@ import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import type { FlowV3NodeData } from "../types";
 import { cn } from "../../../lib/utils";
 import { BlockData } from "../../../types";
-import { CircleDot, GripVertical, PieChart, Settings, Trash2, GitBranch } from "lucide-react";
+import { CircleDot, GripVertical, PieChart, Settings, Trash2, GitBranch, Replace } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
 import { useBlocksMap } from "../utils/BlocksMapContext";
@@ -45,6 +45,14 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
       detail: { nodeId: id, blockUuid: block.uuid }
     }));
   }, [id, block.uuid]);
+
+  // Stable reference - only depends on block.uuid
+  const handleReplace = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('flow-v3-replace-block', {
+      detail: { blockUuid: block.uuid }
+    }));
+  }, [block.uuid]);
 
   // Stable reference - only depends on block.uuid
   const handleAddBranch = useCallback((e: React.MouseEvent) => {
@@ -135,6 +143,15 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
             title="Configure Block"
         >
             <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+        </Button>
+        <Button
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+            onClick={handleReplace}
+            title="Replace Block"
+        >
+            <Replace className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
         </Button>
         {!hasActiveRules && (
           <Button

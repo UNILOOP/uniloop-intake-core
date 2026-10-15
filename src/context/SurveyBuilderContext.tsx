@@ -375,6 +375,8 @@ interface SurveyBuilderContextType {
   setGlobalCustomFields: (customFields: GlobalCustomField[]) => void;
   setCustomData: (customData: any) => void;
   customData: any;
+  /** Hides the "Lock block" control in block settings. */
+  hideBlockLockControls: boolean;
   // Field collection utilities (includes nested fields from output schemas)
   getAvailableFields: (currentBlockId: string) => string[];
   getAvailableFieldsBefore: (currentBlockId: string) => string[];
@@ -396,6 +398,8 @@ interface SurveyBuilderProviderProps {
   };
   enableDebug?: boolean;
   customData?: any;
+  /** Hides the "Lock block" control in block settings. Locked blocks stay locked. */
+  hideBlockLockControls?: boolean;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -410,6 +414,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   initialData,
   enableDebug = false,
   customData,
+  hideBlockLockControls = false,
   mode = 'pageless',
 }) => {
   const [state, dispatch] = useReducer(
@@ -876,6 +881,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     setGlobalCustomFields,
     setCustomData,
     customData: state.customData,
+    hideBlockLockControls,
     getAvailableFields,
     getAvailableFieldsBefore,
     getAvailableFieldsUptoCurrent,

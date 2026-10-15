@@ -26,6 +26,7 @@ import { ContentBlockItem } from "./ContentBlockItem";
 import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
+import { containsLockedBlock } from "../../../utils/blockLock";
 
 interface ContentBlockPageProps {
   data: BlockData;
@@ -40,6 +41,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
 }) => {
   const { state } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
+  const hasLockedBlock = containsLockedBlock(data);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({
@@ -131,6 +133,8 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
             variant="outline"
             size="sm"
             onClick={onRemove}
+            disabled={hasLockedBlock}
+            title={hasLockedBlock ? "This page has a locked block" : undefined}
             className="grow sm:grow-0"
           >
             Remove

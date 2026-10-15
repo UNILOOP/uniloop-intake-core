@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { generateFieldName } from './utils/GenFieldName';
+import { useBlockLock } from '../context/BlockLockContext';
 import { cn } from '../lib/utils';
 import { themes } from '../themes';
 import {
@@ -52,6 +53,10 @@ const CheckboxBlockForm: React.FC<ContentBlockItemProps> = ({
 }) => {
   const [newOptionLabel, setNewOptionLabel] = useState('');
   const [newOptionValue, setNewOptionValue] = useState('');
+  const { isLocked } = useBlockLock();
+  // Adding, removing or reordering options changes which values exist.
+  const optionListLocked = isLocked('options');
+  const optionValuesLocked = isLocked('options[].value');
 
   // Extract options from block data
   const options: CheckboxOption[] = data.options || [];
@@ -166,6 +171,11 @@ const CheckboxBlockForm: React.FC<ContentBlockItemProps> = ({
         <div className="flex justify-between items-center">
           <Label className="text-sm">Checkbox Options</Label>
         </div>
+        {optionListLocked && (
+          <p className="text-xs text-muted-foreground">
+            This block is locked: option labels can change, but not their values or the list of options.
+          </p>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -184,37 +194,41 @@ const CheckboxBlockForm: React.FC<ContentBlockItemProps> = ({
                   index={index}
                   onUpdateOption={handleUpdateOption}
                   onRemoveOption={handleRemoveOption}
+                  valueLocked={optionValuesLocked}
+                  listLocked={optionListLocked}
                 />
               ))}
 
-              <div className="pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 flex items-center justify-center">
-                    <CirclePlus className="h-4 w-4 text-muted-foreground" />
+              {!optionListLocked && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 flex items-center justify-center">
+                      <CirclePlus className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="grow grid grid-cols-2 gap-2">
+                      <Input
+                        value={newOptionLabel}
+                        onChange={(e) => setNewOptionLabel(e.target.value)}
+                        placeholder="New option label"
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
+                      />
+                      <Input
+                        value={newOptionValue}
+                        onChange={(e) => setNewOptionValue(e.target.value)}
+                        placeholder="New option value (optional)"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleAddOption}
+                    >
+                      <CirclePlus className="h-4 w-4 text-primary" />
+                    </Button>
                   </div>
-                  <div className="grow grid grid-cols-2 gap-2">
-                    <Input
-                      value={newOptionLabel}
-                      onChange={(e) => setNewOptionLabel(e.target.value)}
-                      placeholder="New option label"
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
-                    />
-                    <Input
-                      value={newOptionValue}
-                      onChange={(e) => setNewOptionValue(e.target.value)}
-                      placeholder="New option value (optional)"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleAddOption}
-                  >
-                    <CirclePlus className="h-4 w-4 text-primary" />
-                  </Button>
                 </div>
-              </div>
+              )}
             </div>
           </SortableContext>
         </DndContext>
@@ -414,6 +428,10 @@ interface SortableCheckboxOptionProps {
     value: string
   ) => void;
   onRemoveOption: (index: number) => void;
+  /** The block's lock fixes the option's value. */
+  valueLocked?: boolean;
+  /** The block's lock fixes which options exist and their order. */
+  listLocked?: boolean;
 }
 
 const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
@@ -421,6 +439,8 @@ const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
   index,
   onUpdateOption,
   onRemoveOption,
+  valueLocked,
+  listLocked,
 }) => {
   const {
     attributes,
@@ -429,7 +449,7 @@ const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: option.id });
+  } = useSortable({ id: option.id, disabled: listLocked });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -441,7 +461,8 @@ const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
     <div ref={setNodeRef} style={style} className="flex items-center gap-2">
       <button
         type="button"
-        className="cursor-grab hover:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+        className="cursor-grab hover:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={listLocked}
         {...attributes}
         {...listeners}
       >
@@ -460,6 +481,7 @@ const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
           value={option.value}
           onChange={(e) => onUpdateOption(index, 'value', e.target.value)}
           placeholder="Option value"
+          disabled={valueLocked}
         />
       </div>
       <Button
@@ -468,6 +490,7 @@ const SortableCheckboxOption: React.FC<SortableCheckboxOptionProps> = ({
         size="icon"
         onClick={() => onRemoveOption(index)}
         className="text-destructive"
+        disabled={listLocked}
       >
         <CircleX className="h-4 w-4" />
       </Button>
@@ -679,5 +702,10 @@ export const CheckboxBlock: BlockDefinition = {
     enabled: true,
     label: "Field Name",
     required: true
-  }
+  },
+  // Answers are computed on option values, so a locked block keeps its field
+  // name and values while option labels stay editable.
+  lockAccess: {
+    locked: ['fieldName', 'options[].value'],
+  },
 };

@@ -20,6 +20,7 @@ import {
 import { CirclePlus, CircleX, ListFilter, GripVertical } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { generateFieldName } from './utils/GenFieldName';
+import { useBlockLock } from '../context/BlockLockContext';
 import { cn } from '../lib/utils';
 import { themes } from '../themes';
 import {
@@ -53,6 +54,10 @@ const SelectBlockForm: React.FC<ContentBlockItemProps> = ({
 }) => {
   const [newLabel, setNewLabel] = useState('');
   const [newValue, setNewValue] = useState('');
+  const { isLocked } = useBlockLock();
+  // Adding, removing or reordering options changes which values exist.
+  const optionListLocked = isLocked('options');
+  const optionValuesLocked = isLocked('options[].value');
 
   // Convert legacy labels/values arrays to options format
   const options: SelectOption[] =
@@ -203,6 +208,11 @@ const SelectBlockForm: React.FC<ContentBlockItemProps> = ({
 
       <div className="space-y-2">
         <Label>Options</Label>
+        {optionListLocked && (
+          <p className="text-xs text-muted-foreground">
+            This block is locked: option labels can change, but not their values or the list of options.
+          </p>
+        )}
         <div className="border rounded-md p-4 space-y-3">
           <DndContext
             sensors={sensors}
@@ -221,39 +231,43 @@ const SelectBlockForm: React.FC<ContentBlockItemProps> = ({
                     index={index}
                     onUpdateOption={handleUpdateOption}
                     onRemoveOption={handleRemoveOption}
+                    valueLocked={optionValuesLocked}
+                    listLocked={optionListLocked}
                   />
                 ))}
               </div>
             </SortableContext>
           </DndContext>
 
-          <div className="pt-2 border-t mt-2">
-            <div className="flex items-center gap-2 mt-2">
-              <div className="w-6 h-6 flex items-center justify-center">
-                <CirclePlus className="h-4 w-4 text-muted-foreground" />
+          {!optionListLocked && (
+            <div className="pt-2 border-t mt-2">
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <CirclePlus className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="grow grid grid-cols-2 gap-2">
+                  <Input
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    placeholder="New option label"
+                  />
+                  <Input
+                    value={newValue}
+                    onChange={(e) => setNewValue(e.target.value)}
+                    placeholder="New option value (optional)"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleAddOption}
+                >
+                  <CirclePlus className="h-4 w-4 text-primary" />
+                </Button>
               </div>
-              <div className="grow grid grid-cols-2 gap-2">
-                <Input
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="New option label"
-                />
-                <Input
-                  value={newValue}
-                  onChange={(e) => setNewValue(e.target.value)}
-                  placeholder="New option value (optional)"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={handleAddOption}
-              >
-                <CirclePlus className="h-4 w-4 text-primary" />
-              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -430,6 +444,10 @@ interface SortableSelectOptionProps {
     value: string
   ) => void;
   onRemoveOption: (index: number) => void;
+  /** The block's lock fixes the option's value. */
+  valueLocked?: boolean;
+  /** The block's lock fixes which options exist and their order. */
+  listLocked?: boolean;
 }
 
 const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
@@ -437,6 +455,8 @@ const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
   index,
   onUpdateOption,
   onRemoveOption,
+  valueLocked,
+  listLocked,
 }) => {
   const {
     attributes,
@@ -445,7 +465,7 @@ const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: option.id });
+  } = useSortable({ id: option.id, disabled: listLocked });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -457,7 +477,8 @@ const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
     <div ref={setNodeRef} style={style} className="flex items-center gap-2">
       <button
         type="button"
-        className="cursor-grab hover:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+        className="cursor-grab hover:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={listLocked}
         {...attributes}
         {...listeners}
       >
@@ -476,6 +497,7 @@ const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
           value={option.value}
           onChange={(e) => onUpdateOption(index, 'value', e.target.value)}
           placeholder="Option value"
+          disabled={valueLocked}
         />
       </div>
       <Button
@@ -484,6 +506,7 @@ const SortableSelectOption: React.FC<SortableSelectOptionProps> = ({
         size="icon"
         onClick={() => onRemoveOption(index)}
         className="text-destructive"
+        disabled={listLocked}
       >
         <CircleX className="h-4 w-4" />
       </Button>
@@ -697,5 +720,10 @@ export const SelectBlock: BlockDefinition = {
     enabled: true,
     label: "Field Name",
     required: true
-  }
+  },
+  // Answers are computed on option values, so a locked block keeps its field
+  // name and values while option labels stay editable.
+  lockAccess: {
+    locked: ['fieldName', 'options[].value'],
+  },
 };

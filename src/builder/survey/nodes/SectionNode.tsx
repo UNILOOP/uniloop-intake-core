@@ -9,6 +9,7 @@ import { Label } from "../../../components/ui/label";
 import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { NodeData, BlockData } from "../../../types";
+import { containsLockedBlock } from "../../../utils/blockLock";
 import {
   Root as Sortable,
   Content as SortableContent,
@@ -39,6 +40,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
 
   // Determine if we're in pageless mode
   const isPagelessMode = state.mode === 'pageless';
+  const hasLockedBlock = containsLockedBlock(data);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({
@@ -84,6 +86,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   };
 
   const handleRemovePage = (index: number) => {
+    if (containsLockedBlock(data.items?.[index])) return;
     const newItems = [...(data.items || [])];
     newItems.splice(index, 1);
     onUpdate({
@@ -447,6 +450,8 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
             size="sm"
             type="button"
             onClick={onRemove}
+            disabled={hasLockedBlock}
+            title={hasLockedBlock ? "This section has a locked block" : undefined}
           >
             Remove
           </Button>

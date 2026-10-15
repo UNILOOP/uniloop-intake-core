@@ -10,6 +10,9 @@ import {
 import { Plus, X, Pencil } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useDarkMode } from "../utils/useDarkMode";
+import { useBlocksMap } from "../utils/BlocksMapContext";
+import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
+import { isBlockLinkLocked } from "../../../utils/blockLock";
 import {
   calculateEdgePath,
   type NodeBounds,
@@ -84,6 +87,14 @@ const ButtonEdgeInner = ({
   const isDarkMode = useDarkMode();
   const flowNodes = useNodes();
   const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
+  const { state } = useSurveyBuilder();
+  const blocksMap = useBlocksMap();
+
+  // A locked source block keeps its links, so hide the controls that would change them.
+  const sourceBlock = blocksMap.get(source);
+  const sourceDefinition = sourceBlock && state.definitions.blocks[sourceBlock.type];
+  const rulesLocked = isBlockLinkLocked(sourceBlock, sourceDefinition, true);
+  const nextStepLocked = isBlockLinkLocked(sourceBlock, sourceDefinition, false);
 
   // State for reconnection drag
   const [isDragging, setIsDragging] = useState(false);
@@ -189,9 +200,13 @@ const ButtonEdgeInner = ({
     ruleIndex: edgeData?.ruleIndex,
   }), [edgeData?.rule, edgeData?.ruleIndex, edgeData?.insertIndex]);
 
+  // Inserting a block re-points this link to the new block, so a locked link gets no insert button.
+  const linkLocked = isExplicitRule ? rulesLocked : nextStepLocked;
+  const canInsert = showInsertButton && !linkLocked;
+
   // Only show start/end + buttons when this is the only edge from source
   // This prevents confusion when multiple edges share the same origin point
-  const showEndpointButtons = showInsertButton && totalParallelEdges <= 1;
+  const showEndpointButtons = canInsert && totalParallelEdges <= 1;
 
   // Stable callback references
   const onInsertClick = useCallback((evt: React.MouseEvent) => {
@@ -453,7 +468,7 @@ const ButtonEdgeInner = ({
             {/* Actions row - horizontal */}
             <div className="flex items-center gap-1">
               {/* Edit button for explicit rules */}
-              {isExplicitRule && hasRuleIndex && (
+              {isExplicitRule && hasRuleIndex && !rulesLocked && (
                 <button
                   className="h-4 w-4 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 hover:text-amber-500 hover:border-amber-500 dark:hover:text-amber-400 dark:hover:border-amber-400 flex items-center justify-center shadow-sm transition-colors"
                   onClick={onEditClick}
@@ -463,7 +478,7 @@ const ButtonEdgeInner = ({
                 </button>
               )}
 
-              {isExplicitRule && (
+              {isExplicitRule && !rulesLocked && (
                 <button
                   className="h-4 w-4 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 hover:text-red-500 hover:border-red-500 dark:hover:text-red-400 dark:hover:border-red-400 flex items-center justify-center shadow-sm transition-colors"
                   onClick={onDeleteClick}
@@ -474,7 +489,7 @@ const ButtonEdgeInner = ({
               )}
 
               {/* Reconnection Handle */}
-              {source !== 'start' && !isDragging && (
+              {source !== 'start' && !isDragging && !linkLocked && (
                 <div
                   onMouseDown={handleReconnectMouseDown}
                   className="h-4 w-4 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 hover:text-blue-500 hover:border-blue-500 dark:hover:text-blue-400 dark:hover:border-blue-400 flex items-center justify-center shadow-sm transition-colors cursor-grab active:cursor-grabbing"
@@ -490,7 +505,7 @@ const ButtonEdgeInner = ({
         )}
 
         {/* Insert Button - At the start of the edge (near source) */}
-        {showInsertButton && (
+        {canInsert && (
           <div
             style={{
               position: "absolute",
@@ -513,7 +528,7 @@ const ButtonEdgeInner = ({
         )}
 
         {/* Reconnection Handle for edges without labels (sequential edges) - centered on edge */}
-        {!label && !isExplicitRule && source !== 'start' && !isDragging && (
+        {!label && !isExplicitRule && source !== 'start' && !isDragging && !nextStepLocked && (
           <div
             style={{
               position: "absolute",

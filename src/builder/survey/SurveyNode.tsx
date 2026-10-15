@@ -3,6 +3,7 @@ import { SectionNode } from "./nodes/SectionNode";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { NodeData } from "../../types";
 import { useSurveyBuilder } from "../../context/SurveyBuilderContext";
+import { containsLockedBlock } from "../../utils/blockLock";
 
 interface SurveyNodeProps {
   data: NodeData;
@@ -32,7 +33,8 @@ export const SurveyNode: React.FC<SurveyNodeProps> = ({ data }) => {
         updateNode(data.uuid!, updatedData);
       },
       onRemove: () => {
-        if (data.uuid) {
+        // Removing a section that holds a locked block would delete that block
+        if (data.uuid && !containsLockedBlock(data)) {
           removeNode(data.uuid);
         }
       },

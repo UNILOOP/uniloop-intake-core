@@ -127,6 +127,7 @@ export {
   getAllBlockDefinitions,
   registerBlock,
   unregisterBlock,
+  resolveBlockDefinition,
 } from './blocks';
 
 // Field name helpers (value-block field name support)
@@ -178,6 +179,7 @@ export type {
   // Survey form types
   SurveyFormRendererProps,
   SurveyFormContextProps,
+  BlockOverrides,
   ProgressBarOptions,
   NavigationButtonsOptions,
   PageRendererProps,

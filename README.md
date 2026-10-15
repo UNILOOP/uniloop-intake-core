@@ -237,6 +237,8 @@ function BuilderApp() {
 
 The builder supports multiple display modes: `list`, `graph`, `flow`, `lang`, and `theme`.
 
+To show one of your registered blocks in place of a built-in block, pass `blockOverrides` to both `SurveyBuilder` and `SurveyForm`. See [Overriding a System Block](#overriding-a-system-block).
+
 ## Layouts
 
 The `layout` prop accepts a layout name string or a custom `React.FC<LayoutProps>` component.
@@ -1587,6 +1589,31 @@ Custom blocks also work with all layouts, including chat and voice:
 <SurveyForm survey={surveyData} layout="voice" customData={{ aiHandler, ttsHandler }} />
 ```
 
+### Overriding a System Block
+
+To use your own block wherever a built-in block appears, register it and map the built-in type to it with `blockOverrides`. Pass the same mapping to `SurveyForm` and `SurveyBuilder`:
+
+```tsx
+import { SurveyForm, registerBlock } from 'survey-form-package';
+import type { BlockOverrides } from 'survey-form-package';
+import { SurveyBuilder, StandardBlocks } from 'survey-form-package/src/builder';
+
+registerBlock(MyYesNoBlock); // type: 'myYesNo'
+
+// Define the mapping once, so it keeps the same identity between renders.
+const blockOverrides: BlockOverrides = { yesNoAnswer: 'myYesNo' };
+
+<SurveyForm survey={surveyData} blockOverrides={blockOverrides} onSubmit={handleSubmit} />
+<SurveyBuilder blockDefinitions={StandardBlocks} blockOverrides={blockOverrides} />
+```
+
+- Every `yesNoAnswer` block uses `myYesNo`'s definition: `renderBlock`, `chatRenderer`, `validateValue`, schemas and builder methods, in every layout and in the builder.
+- Forms keep the built-in type. The builder shows `myYesNo` in place of the built-in block and saves new blocks as `yesNoAnswer`, so removing the mapping brings the built-in block back. Your block receives blocks whose `type` is `yesNoAnswer`.
+- Save the same answer shape as the block you replace. Rules, computed fields and anything else that reads that answer expect it.
+- If `myYesNo` isn't registered, has no `renderBlock`, or throws while rendering, the built-in block is shown with its own validation. After a throw, every `yesNoAnswer` block uses the built-in block until the page reloads or `myYesNo` is registered again. The library logs one console message per mapping; React also reports the error it caught.
+- Chat and voice layouts show display-only blocks (markdown, HTML, headings, images) as chat text, whatever the mapping.
+- Leave `MyYesNoBlock` out of `blockDefinitions` if it should only appear in place of the built-in block. If you pass it there too, the builder also lists it as a custom block.
+
 ### Block Registry Functions
 
 ```tsx
@@ -1594,6 +1621,7 @@ import {
   registerBlock,          // Add a block to the registry
   unregisterBlock,        // Remove a block from the registry
   getBlockDefinition,     // Get a block definition by type (auto-wrapped with BlockMountGuard)
+  resolveBlockDefinition, // Same, applying a blockOverrides mapping
   getAllBlockDefinitions,  // Get all registered block definitions
   blockRegistry,          // Direct access to the registry Record<string, BlockDefinition>
   clearBlockCache,        // Clear the wrapped block cache (useful for testing)
@@ -2426,6 +2454,7 @@ interface SurveyFormRendererProps {
 
   // Extensibility
   customData?: any;                          // Passed to layouts/blocks
+  blockOverrides?: BlockOverrides;           // e.g. { yesNoAnswer: 'myYesNo' }, see Overriding a System Block
 
   // Debug
   debug?: boolean;

@@ -7,7 +7,7 @@ import { LocalizationEditor } from "./helpers/LocalizationEditor";
 import { v4 as uuidv4 } from "uuid";
 import { BlockLibrary } from "./panels/BlockLibrary";
 import { JsonEditor } from "./helpers/JsonEditor";
-import { BlockDefinition, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, SurveyMode, EditorMode } from "../../types";
+import { BlockDefinition, BlockOverrides, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, SurveyMode, EditorMode } from "../../types";
 import { SurveyBuilderProvider, useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import { SurveyGraph } from "./SurveyGraph";
 import { ThemeBuilder } from "./panels/ThemeBuilder";
@@ -37,6 +37,13 @@ interface SurveyBuilderProps {
    */
   mode?: SurveyMode;
   editorType?: EditorMode;
+  /**
+   * Replaces system blocks with registered blocks, keyed by system block type,
+   * e.g. `{ yesNoAnswer: 'myYesNo' }`. The builder shows and edits the
+   * registered block in place of the system block, and new blocks keep the
+   * system type. Pass the same mapping to `SurveyForm`.
+   */
+  blockOverrides?: BlockOverrides;
 }
 
 // Ref handle interface - methods exposed to parent components
@@ -59,10 +66,11 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   customData,
   logo = null,
   mode = 'pageless',
-  editorType = 'full'
+  editorType = 'full',
+  blockOverrides,
 }, ref) => {
   return (
-    <SurveyBuilderProvider initialData={initialData} customData={customData} mode={mode}>
+    <SurveyBuilderProvider initialData={initialData} customData={customData} blockOverrides={blockOverrides} mode={mode}>
       <SurveyBuilderContent
         ref={ref}
         onDataChange={onDataChange}

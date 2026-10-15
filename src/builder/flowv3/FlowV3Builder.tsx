@@ -562,9 +562,19 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       let updatedItems = items.filter(item => !deletedBlockUuids.has(item.uuid!));
       
       // 5. Update remaining items to bridge the gap
-      updatedItems = updatedItems.map(item => {
+      updatedItems = updatedItems.map((item, newIndex, remaining) => {
           const newItem = { ...item };
           let modified = false;
+
+          // A block that followed the list into a deleted end block now ends the form
+          // too, instead of moving on to whatever comes next in the list
+          if (!newItem.nextBlockId && !newItem.isEndBlock && newIndex < remaining.length - 1) {
+              const sequentialNext = items[items.findIndex(i => i.uuid === item.uuid) + 1];
+              if (sequentialNext?.isEndBlock && deletedBlockUuids.has(sequentialNext.uuid ?? "")) {
+                  newItem.nextBlockId = "submit";
+                  modified = true;
+              }
+          }
 
           // Update nextBlockId
           if (newItem.nextBlockId && bridgeMap.has(newItem.nextBlockId)) {

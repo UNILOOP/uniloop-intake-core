@@ -1339,7 +1339,7 @@ The intake system supports injecting custom block types at runtime. Custom block
 1. Define a `BlockDefinition` object with your block's type, name, rendering logic, and validation
 2. Register it with `registerBlock()` — it's immediately available in both builder and renderer
 3. Use it in survey data by referencing your block's `type` string
-4. Optionally provide `chatRenderer` for chat layout, `outputSchema` for AI validation, and `skipAIValidation`/`disableAudioInput` for voice layout control
+4. Optionally provide `chatRenderer` for chat layout, `outputSchema` for AI validation, `skipAIValidation`/`disableAudioInput` for voice layout control, and `lockAccess` to choose what a locked block keeps fixed (see [Locking Blocks](#locking-blocks))
 
 ### Complete Example: Credit Card Block
 
@@ -1619,6 +1619,12 @@ import {
 | `renderFormFields` | `(props: ContentBlockItemProps) => JSX.Element` | Configuration form for editing block properties |
 | `renderPreview` | `() => JSX.Element` | Small preview shown in the block library |
 | `generateDefaultData` | `() => BlockData` | Optional function to generate default data dynamically |
+
+#### Lock Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `lockAccess` | `{ locked: string[] }` | Which settings stay fixed while a block of this type is locked. Without it, a locked block can't change at all. See [Locking Blocks](#locking-blocks) |
 
 #### Renderer Methods
 
@@ -2637,6 +2643,53 @@ Create navigation rules by connecting nodes in the flow:
 - **Node Selection**: Click to select, multi-select with Ctrl/Cmd
 - **Hierarchical Layout**: Nodes automatically arranged by flow structure
 - **Live Sync**: Changes immediately reflected in survey data
+
+## Locking Blocks
+
+A block with `locked: true` in its data can't be removed or replaced in the builder, in the list view or the flow view, and a page or section that holds one can't be removed. It can still be moved. Block settings show a **Lock block** checkbox. Pass `hideBlockLockControls` to `SurveyBuilder` to hide it, for example when the host decides who locks blocks; blocks saved with `locked: true` stay locked either way.
+
+```tsx
+<SurveyBuilder
+  blockDefinitions={StandardBlocks}
+  nodeDefinitions={StandardNodes}
+  initialData={surveyData}
+  onDataChange={handleSurveyChange}
+  hideBlockLockControls
+/>
+```
+
+By default, a lock fixes every setting of the block. A block definition can leave some settings editable with `lockAccess`, which lists the settings a lock fixes as paths into the block's data, with `[]` for any array item. The built-in question blocks with options keep their wording editable this way, since answers and rules use field names and values, not labels:
+
+| Block | `lockAccess.locked` |
+|-------|---------------------|
+| Radio Buttons, Dropdown Select, Checkbox | `['fieldName', 'options[].value']` |
+| Selectable Box Question | `['fieldName', 'options[].value', 'multiSelect']` |
+| Yes/No Answer (its values are always yes and no) | `['fieldName']` |
+
+A change is refused when its path and a locked path overlap, so adding, removing or reordering options counts as a change to `options[].value`. Selectable Box Question also fixes `multiSelect`, because switching it turns the answer from a value into a list, and rules written for one shape don't match the other. A lock always fixes `type`, `uuid` and the block's A/B test, since each A/B variant holds a full copy of the block.
+
+A locked block's links are fixed with its settings: when its definition locks `navigationRules`, `nextBlockId` or `isEndBlock`, the flow view hides the controls that would change them, including inserting a block on them. When a block it links to is deleted, the link moves on to where the deleted block led.
+
+In a custom block's settings form, `useBlockLock()` gives `locked`, `fullyLocked` and `isLocked(path)`, so the form can disable what the lock fixes. The builder refuses those changes either way, but without it the inputs still look editable. Call it from a component that `renderFormFields` renders:
+
+```tsx
+import { useBlockLock } from 'survey-form-package';
+
+const UnitField = ({ data, onUpdate }: ContentBlockItemProps) => {
+  const { isLocked } = useBlockLock();
+  return (
+    <Input
+      value={data.unit}
+      disabled={isLocked('unit')}
+      onChange={(e) => onUpdate?.({ ...data, unit: e.target.value })}
+    />
+  );
+};
+
+// In the block definition
+renderFormFields: (props) => <UnitField {...props} />,
+lockAccess: { locked: ['unit'] },
+```
 
 ## Mobile Features
 

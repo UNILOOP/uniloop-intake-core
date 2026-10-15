@@ -18,6 +18,7 @@ import {
   OnConnectStart,
   type OnSelectionChangeFunc,
   type OnReconnect,
+  type OnBeforeDelete,
 } from "@xyflow/react";
 import './flowV3.css';
 import { v4 as uuidv4 } from "uuid";
@@ -37,6 +38,7 @@ import { getHumanReadableCondition } from "./utils/conditionLabel";
 import { areAllOptionsCoveredByRules } from "../../utils/conditionalUtils";
 import { Button } from "../../components/ui/button";
 import { BlocksMapProvider } from "./utils/BlocksMapContext";
+import { isBlockLinkLocked, isBlockLocked, isBlockUpdateAllowed } from "../../utils/blockLock";
 
 import { Plus, ArrowUpToLine, ArrowDownToLine, Pencil } from "lucide-react";
 
@@ -120,6 +122,15 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
     });
     return map;
   }, [blocks]);
+
+  // Whether the lock on an edge's source block fixes where that edge leads.
+  const isEdgeLinkLocked = useCallback(
+    (sourceId: string, isRule: boolean) => {
+      const block = blocksMap.get(sourceId);
+      return isBlockLinkLocked(block, block && state.definitions.blocks[block.type], isRule);
+    },
+    [blocksMap, state.definitions.blocks]
+  );
 
   // Create a stable key from block structure to trigger re-computation when structure changes
   // OPTIMIZED: Uses targeted property extraction instead of full JSON.stringify
@@ -443,6 +454,31 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
     return () => clearTimeout(timer);
   }, [pendingPanToNodeId, getNodes, fitView]);
 
+  // Locked blocks stay on the canvas when a selection is deleted.
+  const onBeforeDelete: OnBeforeDelete = useCallback(
+    async ({ nodes: toDelete, edges: edgesToDelete }) => {
+      const lockedIds = new Set(
+        toDelete
+          .filter((n) => n.type === "survey-node" && isBlockLocked(blocksMap.get(n.id)))
+          .map((n) => n.id)
+      );
+      const deletedIds = new Set(toDelete.filter((n) => !lockedIds.has(n.id)).map((n) => n.id));
+      const edges = edgesToDelete.filter((e) => {
+        // An edge goes with a deleted node and stays with a locked one.
+        if (deletedIds.has(e.source) || deletedIds.has(e.target)) return true;
+        if (lockedIds.has(e.source) || lockedIds.has(e.target)) return false;
+        // Deleted on its own, it stays when its source's lock fixes where it leads.
+        return !isEdgeLinkLocked(e.source, !!e.data?.rule);
+      });
+      if (lockedIds.size === 0 && edges.length === edgesToDelete.length) return true;
+      return {
+        nodes: toDelete.filter((n) => !lockedIds.has(n.id)),
+        edges,
+      };
+    },
+    [blocksMap, isEdgeLinkLocked]
+  );
+
   // Handle Node Deletion
   const onNodesDelete = useCallback(
     (deletedNodes: Node[]) => {
@@ -500,9 +536,13 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
 
       deletedBlocks.forEach(block => {
           let nextId = "submit";
-          
+
+          // An end block led to Submit, so the links into it now lead there
+          if (block.isEndBlock) {
+              nextId = "submit";
+          }
           // Priority 1: Explicit nextBlockId (if not deleted)
-          if (block.nextBlockId && !deletedBlockUuids.has(block.nextBlockId)) {
+          else if (block.nextBlockId && !deletedBlockUuids.has(block.nextBlockId)) {
               nextId = block.nextBlockId;
           } 
           // Priority 2: Sequential next (if not deleted)
@@ -607,9 +647,11 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       const updatedRules = sourceBlock.navigationRules.filter(r =>
           r.target !== rule.target || r.condition !== rule.condition
       );
+      const updatedSource = { ...sourceBlock, navigationRules: updatedRules };
+      if (!isBlockUpdateAllowed(sourceBlock, updatedSource, currentState.definitions.blocks[sourceBlock.type])) return;
 
       const updatedItems = items.map(item =>
-          item.uuid === sourceBlock.uuid ? { ...item, navigationRules: updatedRules } : item
+          item.uuid === sourceBlock.uuid ? updatedSource : item
       );
 
       updateNodeRef.current(currentState.rootNode.uuid!, {
@@ -631,6 +673,13 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
 
     const handleAddBlock = (e: Event) => {
       const customEvent = e as CustomEvent<{ insertIndex: number; targetBlockId?: string; sourceBlockId?: string; rule?: any }>;
+      // Inserting re-points the source's link to the new block, which its lock may fix
+      const { sourceBlockId, rule } = customEvent.detail;
+      const currentState = stateRef.current;
+      const insertSource = sourceBlockId
+        ? (currentState.rootNode?.items as BlockData[] | undefined)?.find(b => b.uuid === sourceBlockId)
+        : undefined;
+      if (insertSource && isBlockLinkLocked(insertSource, currentState.definitions.blocks[insertSource.type], !!rule)) return;
       setInsertIndex(customEvent.detail.insertIndex);
       setInsertTargetId(customEvent.detail.targetBlockId || null);
       setInsertSourceId(customEvent.detail.sourceBlockId || null);
@@ -657,6 +706,9 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       const currentState = stateRef.current;
 
       if (!currentState.rootNode) return;
+
+      const current = (currentState.rootNode.items as BlockData[] | undefined)?.find((item) => item.uuid === blockUuid);
+      if (current && !isBlockUpdateAllowed(current, data, currentState.definitions.blocks[current.type])) return;
 
       const updatedItems = (currentState.rootNode.items || []).map((item) =>
         (item as BlockData).uuid === blockUuid ? data : item
@@ -710,6 +762,8 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         }
       }
 
+      if (!isBlockUpdateAllowed(sourceBlock, updatedBlock, currentState.definitions.blocks[sourceBlock.type])) return;
+
       // Update the state
       const updatedItems = items.map(item =>
         item.uuid === sourceBlock.uuid ? updatedBlock : item
@@ -756,6 +810,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
   const handleBlockReplace = useCallback(
     (data: BlockData) => {
       if (!state.rootNode || !replaceBlockUuid) return;
+      if (isBlockLocked(blocksMap.get(replaceBlockUuid))) return;
 
       updateNode(state.rootNode.uuid!, {
         ...state.rootNode,
@@ -764,7 +819,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         ),
       });
     },
-    [state.rootNode, replaceBlockUuid, updateNode]
+    [state.rootNode, replaceBlockUuid, blocksMap, updateNode]
   );
 
   const handleResetLayout = useCallback(() => {
@@ -813,6 +868,11 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       ...sourceBlock,
       navigationRules: [...(sourceBlock.navigationRules || []), newRule],
     };
+    if (!isBlockUpdateAllowed(sourceBlock, updatedSourceBlock, state.definitions.blocks[sourceBlock.type])) {
+      setShowBlockSelector(false);
+      setBranchSourceId(null);
+      return;
+    }
 
     // Update Items List: replace source, append new block
     const updatedItems = items.map(item => 
@@ -905,6 +965,16 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
                         updatedItems[sourceIndex] = sourceBlock;
                     }
                 }
+
+                // A locked source keeps its link, so the insert doesn't happen
+                const originalSource = currentItems[sourceIndex];
+                if (!isBlockUpdateAllowed(originalSource, updatedItems[sourceIndex], state.definitions.blocks[originalSource.type])) {
+                    setInsertIndex(null);
+                    setInsertTargetId(null);
+                    setInsertSourceId(null);
+                    setInsertRule(null);
+                    return;
+                }
             }
         }
 
@@ -954,7 +1024,8 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
       const sourceNode = getNodes().find((n) => n.id === sourceId);
       if (!sourceNode || sourceNode.type !== "survey-node") return;
 
-      const blockData = (sourceNode.data as any).block as BlockData;
+      const nodeBlock = (sourceNode.data as any).block as BlockData;
+      const blockData = (nodeBlock.uuid && blocksMap.get(nodeBlock.uuid)) || nodeBlock;
       
       // Target can be block or submit
       const targetNode = getNodes().find((n) => n.id === targetId);
@@ -975,6 +1046,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
             ...blockData,
             navigationRules: [...(blockData.navigationRules || []), newRule],
           };
+          if (!isBlockUpdateAllowed(blockData, updatedBlock, state.definitions.blocks[blockData.type])) return;
 
           const updatedItems = (state.rootNode?.items || []).map((item) =>
             (item as BlockData).uuid === blockData.uuid ? updatedBlock : item
@@ -992,7 +1064,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
           setEditRuleIndex(newRuleIndex);
           setHideRemoveButton(false); // Allow removing the newly created rule
           setShowNodeConfig(true);
-  }, [getNodes, state.rootNode, updateNode]);
+  }, [getNodes, blocksMap, state.rootNode, state.definitions.blocks, updateNode]);
 
   // Connect Handler
   const onConnect: OnConnect = useCallback(
@@ -1083,6 +1155,8 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         }
       }
 
+      if (!isBlockUpdateAllowed(sourceBlock, updatedBlock, state.definitions.blocks[sourceBlock.type])) return;
+
       // Update the state
       const updatedItems = items.map(item =>
         item.uuid === sourceBlock.uuid ? updatedBlock : item
@@ -1093,7 +1167,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         items: updatedItems,
       });
     },
-    [state.rootNode, updateNode, getNodes]
+    [state.rootNode, state.definitions.blocks, updateNode, getNodes]
   );
 
   // Handle Node Double Click
@@ -1330,6 +1404,8 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
     };
   }, [edgeTooltip, closeEdgeTooltip]);
 
+  const tooltipLinkLocked = !!edgeTooltip && isEdgeLinkLocked(edgeTooltip.sourceId, edgeTooltip.isExplicitRule);
+
   return (
     <BlocksMapProvider value={blocksMap}>
     <div className="h-full flex flex-col">
@@ -1368,6 +1444,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
+                onBeforeDelete={onBeforeDelete}
                 onNodesDelete={onNodesDelete}
                 onConnect={onConnect}
                 onConnectStart={onConnectStart}
@@ -1461,7 +1538,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
                     </Button>
 
                     {/* Insert Block button */}
-                    {typeof edgeTooltip.insertIndex === 'number' && (
+                    {typeof edgeTooltip.insertIndex === 'number' && !tooltipLinkLocked && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1475,7 +1552,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
                     )}
 
                     {/* Edit button for explicit rules */}
-                    {edgeTooltip.isExplicitRule && edgeTooltip.ruleIndex !== undefined && (
+                    {edgeTooltip.isExplicitRule && edgeTooltip.ruleIndex !== undefined && !tooltipLinkLocked && (
                       <Button
                         variant="ghost"
                         size="sm"

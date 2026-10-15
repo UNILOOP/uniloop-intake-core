@@ -133,6 +133,9 @@ export {
 export { generateFieldName, sanitizeFieldName } from './blocks/utils/GenFieldName';
 export { FieldNameField, useFieldName, resolveFieldConfig } from './builder/common/FieldNameField';
 
+// Block lock state for a custom block's settings form
+export { useBlockLock } from './context/BlockLockContext';
+
 // --------------------------------------------------------------------------
 // Types - Export specific types needed for rendering (not export *)
 // --------------------------------------------------------------------------
@@ -147,6 +150,7 @@ export type {
   // Block types
   BlockDefinition,
   FieldNameConfig,
+  BlockLockAccess,
   BlockData,
   BlockRendererProps,
   ContentBlockItemProps,

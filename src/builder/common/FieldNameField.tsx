@@ -3,6 +3,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import type { BlockData, BlockDefinition, FieldNameConfig } from "../../types";
 import { sanitizeFieldName } from "../../blocks/utils/GenFieldName";
+import { useBlockLock } from "../../context/BlockLockContext";
 
 /**
  * FieldNameField
@@ -94,6 +95,7 @@ interface FieldNameFieldProps {
 export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, config }) => {
   const resolved = config ?? DEFAULT_FIELD_CONFIG;
   const field = useFieldName({ data, onUpdate });
+  const { isLocked } = useBlockLock();
 
   return (
     <div className="space-y-2">
@@ -106,6 +108,7 @@ export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, 
         onChange={field.onChange}
         onBlur={field.onBlur}
         placeholder={resolved.placeholder}
+        disabled={isLocked("fieldName")}
       />
       <p className="text-xs text-muted-foreground">{resolved.description}</p>
     </div>

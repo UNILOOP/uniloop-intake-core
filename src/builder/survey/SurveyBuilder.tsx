@@ -37,6 +37,11 @@ interface SurveyBuilderProps {
    */
   mode?: SurveyMode;
   editorType?: EditorMode;
+  /**
+   * Hides the "Lock block" control from block settings, so editors can't lock
+   * or unlock blocks. Blocks saved with `locked: true` stay locked.
+   */
+  hideBlockLockControls?: boolean;
 }
 
 // Ref handle interface - methods exposed to parent components
@@ -59,10 +64,11 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   customData,
   logo = null,
   mode = 'pageless',
-  editorType = 'full'
+  editorType = 'full',
+  hideBlockLockControls = false,
 }, ref) => {
   return (
-    <SurveyBuilderProvider initialData={initialData} customData={customData} mode={mode}>
+    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} mode={mode}>
       <SurveyBuilderContent
         ref={ref}
         onDataChange={onDataChange}

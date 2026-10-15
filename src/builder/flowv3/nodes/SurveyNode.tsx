@@ -4,10 +4,11 @@ import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import type { FlowV3NodeData } from "../types";
 import { cn } from "../../../lib/utils";
 import { BlockData } from "../../../types";
-import { CircleDot, GripVertical, PieChart, Settings, Trash2, GitBranch, Replace } from "lucide-react";
+import { CircleDot, GripVertical, Lock, PieChart, Settings, Trash2, GitBranch, Replace } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
 import { useBlocksMap } from "../utils/BlocksMapContext";
+import { isBlockLocked, isBlockPathLocked } from "../../../utils/blockLock";
 
 // Custom Node Component - Performance optimized
 // Using areEqual comparison to prevent unnecessary re-renders
@@ -32,11 +33,16 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
     [state.definitions.blocks, block.type]
   );
 
+  const locked = isBlockLocked(block);
+  // Adding a branch adds a navigation rule to this block.
+  const canAddBranch = !isBlockPathLocked(block, blockDefinition, "navigationRules");
+
   // Stable reference for delete - only depends on id and deleteElements
   const handleDelete = useCallback((e?: React.MouseEvent) => {
       e?.stopPropagation();
+      if (locked) return;
       deleteElements({ nodes: [{ id }] });
-  }, [id, deleteElements]);
+  }, [id, locked, deleteElements]);
 
   // Stable reference - only depends on id and block.uuid
   const handleConfigure = useCallback((e: React.MouseEvent) => {
@@ -109,11 +115,17 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
           </span>
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-wrap gap-1">
           {block.abTest?.enabled && (
             <Badge variant="secondary" className="gap-1">
               <PieChart className="h-3 w-3" />
               A/B Testing ({block.abTest.variants.length} variants)
+            </Badge>
+          )}
+          {locked && (
+            <Badge variant="secondary" className="gap-1">
+              <Lock className="h-3 w-3" />
+              Locked
             </Badge>
           )}
         </div>
@@ -126,15 +138,17 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
 
       {/* Node Actions Toolbar (Visible on Hover) */}
       <div className="absolute -top-3 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-        <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-7 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
-            onClick={handleAddBranch}
-            title="Add Branch"
-        >
-            <GitBranch className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-        </Button>
+        {canAddBranch && (
+          <Button
+              variant="secondary"
+              size="icon"
+              className="h-7 w-7 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+              onClick={handleAddBranch}
+              title="Add Branch"
+          >
+              <GitBranch className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+          </Button>
+        )}
         <Button
             variant="secondary"
             size="icon"
@@ -144,16 +158,18 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
         >
             <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
         </Button>
-        <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-7 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
-            onClick={handleReplace}
-            title="Replace Block"
-        >
-            <Replace className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-        </Button>
-        {!hasActiveRules && (
+        {!locked && (
+          <Button
+              variant="secondary"
+              size="icon"
+              className="h-7 w-7 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+              onClick={handleReplace}
+              title="Replace Block"
+          >
+              <Replace className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+          </Button>
+        )}
+        {!hasActiveRules && !locked && (
           <Button
               variant="destructive"
               size="icon"
@@ -187,6 +203,7 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
       <Handle
         type="source"
         position={Position.Bottom}
+        isConnectable={canAddBranch}
         className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white dark:!border-slate-900"
       />
     </div>
@@ -211,6 +228,7 @@ const areEqual = (
   if (prevBlock.fieldName !== nextBlock.fieldName) return false;
   if (prevBlock.label !== nextBlock.label) return false;
   if (prevBlock.isEndBlock !== nextBlock.isEndBlock) return false;
+  if (prevBlock.locked !== nextBlock.locked) return false;
 
   // Check navigation rules (shallow compare length and targets)
   const prevRules = prevBlock.navigationRules || [];

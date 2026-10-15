@@ -401,7 +401,11 @@ function evaluateEnhancedCondition(condition: string, currentValues: CurrentValu
       const fieldValue = getValueFromPath(currentValues, inArrayMatch[2]);
       try {
         const arrayValue = JSON.parse(inArrayMatch[1]);
-        return Array.isArray(arrayValue) && arrayValue.includes(fieldValue);
+        if (!Array.isArray(arrayValue)) return false;
+        // A multi select answer is in the list when all its choices are
+        return Array.isArray(fieldValue)
+          ? fieldValue.every(v => arrayValue.includes(v))
+          : arrayValue.includes(fieldValue);
       } catch { /* fallthrough */ }
     }
 
@@ -411,7 +415,11 @@ function evaluateEnhancedCondition(condition: string, currentValues: CurrentValu
       const fieldValue = getValueFromPath(currentValues, notInArrayMatch[2]);
       try {
         const arrayValue = JSON.parse(notInArrayMatch[1]);
-        return Array.isArray(arrayValue) && !arrayValue.includes(fieldValue);
+        if (!Array.isArray(arrayValue)) return false;
+        // A multi select answer is not in the list when none of its choices are
+        return Array.isArray(fieldValue)
+          ? !fieldValue.some(v => arrayValue.includes(v))
+          : !arrayValue.includes(fieldValue);
       } catch { /* fallthrough */ }
     }
 
@@ -469,10 +477,14 @@ function evaluateEnhancedCondition(condition: string, currentValues: CurrentValu
       const fieldValue = getValueFromPath(currentValues, comparisonMatch[1]);
       let value: any = comparisonMatch[3];
       try { value = JSON.parse(comparisonMatch[3]); } catch { /* keep as string */ }
+      // A multi select answer equals "value" when "value" is one of its choices
+      const equals = Array.isArray(fieldValue)
+        ? fieldValue.some(v => v == value)
+        : fieldValue == value;
 
       switch (comparisonMatch[2]) {
-        case '==': return fieldValue == value;
-        case '!=': return fieldValue != value;
+        case '==': return equals;
+        case '!=': return !equals;
         case '>': return fieldValue > value;
         case '>=': return fieldValue >= value;
         case '<': return fieldValue < value;

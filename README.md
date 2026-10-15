@@ -2,12 +2,6 @@
 
 A powerful, customizable React intake form renderer and builder library with TypeScript support, featuring AI-powered conversational layouts, advanced conditional logic, comprehensive theming, analytics, and A/B testing capabilities. Code identifiers use `Survey*` naming (e.g., `SurveyForm`, `SurveyBuilder`).
 
-## Runtime Architecture
-
-How this package runs inside Uniloop when a patient enrolls: the main path from the enroll page to UniEMR, the services it calls, and the trust boundaries between them.
-
-![Intake core runtime architecture: patient browser, Uniloop platform, UniEMR and third-party services](docs/runtime-architecture.png)
-
 ## Features
 
 ### **Core Rendering**
@@ -2935,6 +2929,12 @@ const registrationSurvey = {
   }}
 />
 ```
+
+## Uniloop Runtime Architecture
+
+This package isn't tied to Uniloop: any survey or intake platform can be built on it. Uniloop is one such platform. The diagram shows how Uniloop runs this package when a patient enrolls: the main path from the enroll page to UniEMR, the services it calls, and the trust boundaries between them.
+
+![Uniloop runtime architecture: patient browser, Uniloop platform, UniEMR and third-party services](docs/uniloop-runtime-architecture.png)
 
 ## Contributing
 

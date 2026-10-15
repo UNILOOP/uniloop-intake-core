@@ -14,7 +14,7 @@ import type {
   VoiceLayoutMode,
 } from './types';
 import { classifyQuestion, matchVoiceToOption, hasBlockOptions } from './QuestionClassifier';
-import { getBlockDefinition } from '../../../blocks';
+import { resolveBlockDefinition } from '../../../blocks';
 import { useVoiceValidation } from './hooks/useVoiceValidation';
 import { useVoiceSession, type VoiceSessionHandlers } from './hooks/useVoiceSession';
 import { VoiceOrb } from './components/VoiceOrb';
@@ -139,6 +139,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
     theme,
     surveyData,
     customData,
+    blockOverrides,
     getVisibleBlocks,
     getTotalVisibleSteps,
     getCurrentStepPosition,
@@ -220,7 +221,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
   const currentQuestionIndex = getCurrentStepPosition?.() ?? 0;
 
   // Get block definition to check for disableAudioInput
-  const currentBlockDefinition = currentBlock ? getBlockDefinition(currentBlock.type) : undefined;
+  const currentBlockDefinition = currentBlock ? resolveBlockDefinition(currentBlock.type, blockOverrides) : undefined;
 
   // Check if audio input should be disabled (check both block instance and definition)
   const shouldDisableAudioInput =
@@ -376,7 +377,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
       }
 
       // Get block definition to check for skipAIValidation
-      const blockDefinition = getBlockDefinition(currentBlock.type);
+      const blockDefinition = resolveBlockDefinition(currentBlock.type, blockOverrides);
 
       // Check if AI validation should be skipped (check both block instance and definition)
       const shouldSkipAIValidation =
@@ -680,7 +681,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
         proceedToNextOrSubmit(fieldName, transcript);
       }, 300);
     },
-    [currentBlock, setValue, voiceCustomData, validateAnswer, awaitingConfirmation, pendingValidation, resetMultiSelectState, proceedToNextOrSubmit, clearSubsequentBlocksData]
+    [currentBlock, setValue, voiceCustomData, validateAnswer, awaitingConfirmation, pendingValidation, resetMultiSelectState, proceedToNextOrSubmit, clearSubsequentBlocksData, blockOverrides]
   );
 
   // Prepare session handlers from customData (including TTS/STT/MediaCapture)

@@ -2,7 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../../lib/utils';
 import type { VisualInputWrapperProps } from '../types';
-import { getBlockDefinition } from '../../../../blocks';
+import { resolveBlockDefinition } from '../../../../blocks';
+import { useBlockOverrideFailures } from '../../../renderers/BlockOverrideBoundary';
+import { useSurveyForm } from '../../../../context/SurveyFormContext';
 import type { BlockRendererProps, ChatRendererProps } from '../../../../types';
 
 /**
@@ -26,7 +28,10 @@ export const VisualInputWrapper: React.FC<VisualInputWrapperProps> = ({
   const [localValue, setLocalValue] = useState(value);
   const [showingInput, setShowingInput] = useState(true);
 
-  const blockDefinition = getBlockDefinition(block.type);
+  const { blockOverrides } = useSurveyForm();
+  // Look the block up again once an override fails, so the system block's input is used.
+  useBlockOverrideFailures();
+  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
 
   /**
    * Handle value change

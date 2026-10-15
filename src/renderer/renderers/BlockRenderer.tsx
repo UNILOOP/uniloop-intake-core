@@ -1,6 +1,6 @@
 import React, { forwardRef, useMemo } from 'react';
 import type { BlockRendererProps } from '../../types';
-import { getBlockDefinition } from '../../blocks';
+import { resolveBlockDefinition } from '../../blocks';
 import { validateBlock } from '../../utils/blockAdapter';
 import { useSurveyForm } from '../../context/SurveyFormContext';
 import { getBlockDataForRendering } from '../../utils/abTestUtils';
@@ -12,7 +12,7 @@ import { localizeBlockForRendering } from '../../utils/surveyUtils';
  */
 export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props, _ref) => {
   const { block, value, onChange, onBlur, error, disabled, customComponents, theme = null, isVisible } = props;
-  const { analytics, enableDebug, abTestPreviewMode, language, surveyData } = useSurveyForm();
+  const { analytics, enableDebug, abTestPreviewMode, language, surveyData, blockOverrides } = useSurveyForm();
 
   // Apply A/B testing variant selection if enabled
   const blockToRender = useMemo(() => {
@@ -52,7 +52,7 @@ export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props,
   }
 
   // Check if we have a unified block definition with renderBlock method
-  const blockDefinition = getBlockDefinition(blockToRender.type);
+  const blockDefinition = resolveBlockDefinition(blockToRender.type, blockOverrides);
   if (blockDefinition?.renderBlock) {
     return (
       <>

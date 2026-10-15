@@ -179,7 +179,7 @@ export class GoogleTagManagerProvider implements AnalyticsProvider {
             this.eventMappings?.global_drop_keys?.google_tag_manager ?? [],
             this.eventMappings?.global_hash_keys?.google_tag_manager ?? [],
             ['event'],
-            this.hipaaFilter,
+            mapping?.hipaa_filter ?? this.hipaaFilter,
         ) as GTMDataLayerEvent;
 
         this.pushToDataLayer(gtmEvent);

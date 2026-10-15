@@ -357,7 +357,7 @@ export class CustomPixelProvider implements AnalyticsProvider {
             this.eventMappings?.global_drop_keys?.[channelKey] ?? [],
             this.eventMappings?.global_hash_keys?.[channelKey] ?? [],
             [],
-            pixel.hipaa_filter ?? false,
+            mapping.hipaa_filter ?? pixel.hipaa_filter ?? false,
         );
     }
 

@@ -33,6 +33,12 @@ export const HIPAA_SENSITIVE_FIELDS: readonly string[] = [
     'dob',
     'birthdate',
     'birth_date',
+    'patient',
+    'user_id',
+    'gender',
+    'sex',
+    'height',
+    'weight',
 
     // Medical information
     'medical_history',

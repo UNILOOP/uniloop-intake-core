@@ -265,7 +265,7 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
         }
       : eventData;
     Object.keys(canonicalData).forEach((key) => canonicalData[key] === undefined && delete canonicalData[key]);
-    const payload = buildMappedAnalyticsPayload(canonicalData, mapping, globalDrops, globalHashes, [], this.hipaaFilter);
+    const payload = buildMappedAnalyticsPayload(canonicalData, mapping, globalDrops, globalHashes, [], mapping?.hipaa_filter ?? this.hipaaFilter);
     window.gtag('event', mapping?.name ?? event.action, payload);
 
     if (this.debug) {

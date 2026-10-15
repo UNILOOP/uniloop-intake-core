@@ -27,6 +27,7 @@ export interface AnalyticsEventMappings {
 export interface AnalyticsChannelMapping {
     consent_category?: 'necessary' | 'preferences' | 'analytics' | 'marketing' | null;
     enabled?: boolean;
+    hipaa_filter?: boolean;
     name?: string;
     /**
      * Canonical source key → output key (string shorthand) or a field-map

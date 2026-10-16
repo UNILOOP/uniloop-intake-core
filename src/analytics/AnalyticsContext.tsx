@@ -101,7 +101,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize Google Ads
-        if (config.googleAds?.conversionId) {
+        if (config.googleAds) {
           const googleAdsProvider = new GoogleAdsProvider();
           await googleAdsProvider.initialize({
             ...config.googleAds,

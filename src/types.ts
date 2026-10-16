@@ -390,7 +390,7 @@ export interface SurveyFormRendererProps {
       debug?: boolean;
     };
     googleAds?: {
-      conversionId: string;
+      conversionId?: string;
       eventMappings?: import('./analytics/types').AnalyticsEventMappings;
       hipaaFilter?: boolean;
       debug?: boolean;

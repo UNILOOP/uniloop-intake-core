@@ -10,12 +10,12 @@ export class GoogleAdsProvider implements AnalyticsProvider {
     private debug = false;
 
     async initialize(config: {
-        conversionId: string;
+        conversionId?: string;
         eventMappings?: AnalyticsEventMappings;
         hipaaFilter?: boolean;
         debug?: boolean;
     }): Promise<void> {
-        const conversionId = config.conversionId.trim().toUpperCase();
+        const conversionId = (config.conversionId ?? this.mappedConversionId(config.eventMappings) ?? '').trim().toUpperCase();
         if (!/^AW-[0-9]{4,20}$/.test(conversionId)) {
             throw new Error('Google Ads conversion ID must use the AW-123456789 format.');
         }
@@ -76,7 +76,13 @@ export class GoogleAdsProvider implements AnalyticsProvider {
 
     private fireConversion(event: ProviderAnalyticsEvent, mapping?: AnalyticsChannelMapping): void {
         const conversionLabel = mapping?.name?.trim();
-        if (mapping?.enabled === false || !conversionLabel || !/^[A-Za-z0-9_-]+$/.test(conversionLabel)) return;
+        const conversionId = mapping?.conversion_id?.trim().toUpperCase() || this.conversionId;
+        if (
+            mapping?.enabled === false ||
+            !/^AW-[0-9]{4,20}$/.test(conversionId) ||
+            !conversionLabel ||
+            !/^[A-Za-z0-9_-]+$/.test(conversionLabel)
+        ) return;
 
         const canonicalPayload: Record<string, unknown> = {
             ...(event.metadata ?? {}),
@@ -98,9 +104,23 @@ export class GoogleAdsProvider implements AnalyticsProvider {
             [],
             mapping?.hipaa_filter ?? this.hipaaFilter,
         );
-        payload.send_to = `${this.conversionId}/${conversionLabel}`;
+        payload.send_to = `${conversionId}/${conversionLabel}`;
         window.gtag?.('event', 'conversion', payload);
 
         if (this.debug) console.log('[GoogleAds] Conversion tracked:', conversionLabel, payload);
+    }
+
+    private mappedConversionId(eventMappings?: AnalyticsEventMappings): string | undefined {
+        for (const channels of Object.values(eventMappings?.events ?? {})) {
+            const conversionId = channels.google_ads?.conversion_id;
+            if (typeof conversionId === 'string' && /^AW-[0-9]{4,20}$/.test(conversionId)) return conversionId;
+        }
+
+        for (const customEvent of eventMappings?.custom_events ?? []) {
+            const conversionId = customEvent.channels.google_ads?.conversion_id;
+            if (typeof conversionId === 'string' && /^AW-[0-9]{4,20}$/.test(conversionId)) return conversionId;
+        }
+
+        return undefined;
     }
 }

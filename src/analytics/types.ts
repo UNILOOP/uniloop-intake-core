@@ -29,6 +29,7 @@ export interface AnalyticsChannelMapping {
     enabled?: boolean;
     hipaa_filter?: boolean;
     name?: string;
+    conversion_id?: string | null;
     /**
      * Canonical source key → output key (string shorthand) or a field-map
      * entry object `{ to, level, type, formats, hash }`; see fieldFormats.ts.
@@ -74,7 +75,7 @@ export interface AnalyticsConfig {
         debug?: boolean;
     };
     googleAds?: {
-        conversionId: string;
+        conversionId?: string;
         eventMappings?: AnalyticsEventMappings;
         hipaaFilter?: boolean;
         debug?: boolean;

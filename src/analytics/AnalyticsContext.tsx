@@ -7,6 +7,7 @@ import type {
   SurveyAnalyticsEvent
 } from './types';
 import { GoogleAnalyticsProvider } from './providers/GoogleAnalyticsProvider';
+import { GoogleAdsProvider } from './providers/GoogleAdsProvider';
 import { GoogleTagManagerProvider } from './providers/GoogleTagManagerProvider';
 import { MetaPixelProvider } from './providers/MetaPixelProvider';
 import { CustomPixelProvider } from './providers/CustomPixelProvider';
@@ -97,6 +98,17 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
           if (debug) {
             console.log('[Analytics] Google Analytics initialized successfully');
           }
+        }
+
+        // Initialize Google Ads
+        if (config.googleAds?.conversionId) {
+          const googleAdsProvider = new GoogleAdsProvider();
+          await googleAdsProvider.initialize({
+            ...config.googleAds,
+            eventMappings: config.googleAds.eventMappings ?? config.eventMappings,
+            debug: debug || config.googleAds.debug,
+          });
+          activeProviders.push(googleAdsProvider);
         }
 
         // Initialize Google Tag Manager

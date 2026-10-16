@@ -73,6 +73,12 @@ export interface AnalyticsConfig {
         hipaaFilter?: boolean;
         debug?: boolean;
     };
+    googleAds?: {
+        conversionId: string;
+        eventMappings?: AnalyticsEventMappings;
+        hipaaFilter?: boolean;
+        debug?: boolean;
+    };
     // Google Tag Manager configuration
     googleTagManager?: {
         containerId: string;

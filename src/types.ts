@@ -389,6 +389,12 @@ export interface SurveyFormRendererProps {
       hipaaFilter?: boolean;
       debug?: boolean;
     };
+    googleAds?: {
+      conversionId: string;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
+      hipaaFilter?: boolean;
+      debug?: boolean;
+    };
     googleTagManager?: {
       containerId: string;
       auth?: string;

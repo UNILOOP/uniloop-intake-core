@@ -295,6 +295,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       googleAnalytics: analytics.googleAnalytics
         ? { ...analytics.googleAnalytics, eventMappings: analytics.googleAnalytics.eventMappings ?? mappings }
         : undefined,
+      googleAds: analytics.googleAds
+        ? { ...analytics.googleAds, eventMappings: analytics.googleAds.eventMappings ?? mappings }
+        : undefined,
       googleTagManager: analytics.googleTagManager
         ? { ...analytics.googleTagManager, eventMappings: analytics.googleTagManager.eventMappings ?? mappings }
         : undefined,
@@ -316,6 +319,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
     () =>
       analytics?.enabled !== false &&
       (analytics?.googleAnalytics ||
+        analytics?.googleAds ||
         analytics?.googleTagManager ||
         analytics?.meta ||
         (analytics?.customPixels?.pixels && analytics.customPixels.pixels.length > 0) ||

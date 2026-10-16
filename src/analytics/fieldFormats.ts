@@ -61,6 +61,7 @@ export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
             { id: 'iso', label: 'ISO 8601', example: '2024-01-05' },
             { id: 'us', label: 'US', example: '01/05/2024' },
             { id: 'eu', label: 'Day first', example: '05/01/2024' },
+            { id: 'meta_dob', label: 'Meta date of birth', example: '2/16/1997 → 19970216' },
             { id: 'unix', label: 'Unix seconds', example: '1704412800' },
             { id: 'unix_ms', label: 'Unix milliseconds', example: '1704412800000' },
         ],
@@ -111,6 +112,10 @@ export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
             { id: 'trim', label: 'Trimmed', example: 'Jane' },
             { id: 'lowercase', label: 'Lowercase', example: 'jane' },
             { id: 'uppercase', label: 'Uppercase', example: 'JANE' },
+            { id: 'meta_gender', label: 'Meta gender', example: 'Female → f' },
+            { id: 'meta_city', label: 'Meta city', example: 'New York → newyork' },
+            { id: 'meta_state', label: 'Meta state', example: 'California → ca' },
+            { id: 'meta_postal_code', label: 'Meta ZIP / postal', example: '94035-1234 → 94035' },
         ],
     },
     {
@@ -324,6 +329,66 @@ const US_PATTERN = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[T ](\d{1,2}):(\d{2})(?
 const TIME_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 const MILLIS_THRESHOLD = 10_000_000_000;
+const META_US_STATE_CODES: Record<string, string> = {
+    alabama: 'al',
+    alaska: 'ak',
+    americansamoa: 'as',
+    arizona: 'az',
+    arkansas: 'ar',
+    california: 'ca',
+    colorado: 'co',
+    connecticut: 'ct',
+    delaware: 'de',
+    districtofcolumbia: 'dc',
+    florida: 'fl',
+    georgia: 'ga',
+    guam: 'gu',
+    hawaii: 'hi',
+    idaho: 'id',
+    illinois: 'il',
+    indiana: 'in',
+    iowa: 'ia',
+    kansas: 'ks',
+    kentucky: 'ky',
+    louisiana: 'la',
+    maine: 'me',
+    maryland: 'md',
+    massachusetts: 'ma',
+    michigan: 'mi',
+    minnesota: 'mn',
+    mississippi: 'ms',
+    missouri: 'mo',
+    montana: 'mt',
+    nebraska: 'ne',
+    nevada: 'nv',
+    newhampshire: 'nh',
+    newjersey: 'nj',
+    newmexico: 'nm',
+    newyork: 'ny',
+    northcarolina: 'nc',
+    northdakota: 'nd',
+    northernmarianaislands: 'mp',
+    ohio: 'oh',
+    oklahoma: 'ok',
+    oregon: 'or',
+    pennsylvania: 'pa',
+    puertorico: 'pr',
+    rhodeisland: 'ri',
+    southcarolina: 'sc',
+    southdakota: 'sd',
+    tennessee: 'tn',
+    texas: 'tx',
+    unitedstatesminoroutlyingislands: 'um',
+    utah: 'ut',
+    vermont: 'vt',
+    virginislands: 'vi',
+    virginia: 'va',
+    washington: 'wa',
+    washingtondc: 'dc',
+    westvirginia: 'wv',
+    wisconsin: 'wi',
+    wyoming: 'wy',
+};
 
 interface TemporalParts {
     year: number;
@@ -408,6 +473,8 @@ function formatPhone(value: unknown, format: string): string | null {
 }
 
 function formatDate(value: unknown, format: string): string | number | null {
+    if (format === 'meta_dob') return formatMetaDateOfBirth(value);
+
     const parts = parseTemporal(value);
     if (!parts || !parts.hasDate) return null;
 
@@ -512,9 +579,68 @@ function formatText(value: unknown, format: string): string | null {
             return text.toLowerCase();
         case 'uppercase':
             return text.toUpperCase();
+        case 'meta_gender':
+            return formatMetaGender(text);
+        case 'meta_city':
+            return compactMetaText(text);
+        case 'meta_state':
+            return formatMetaState(text);
+        case 'meta_postal_code':
+            return formatMetaPostalCode(text);
         default:
             return null;
     }
+}
+
+function formatMetaDateOfBirth(value: unknown): string | null {
+    const text = scalarToString(value);
+    if (text === null) return null;
+
+    const compact = text.replace(/\D+/g, '');
+    if (compact.length === 8) {
+        const year = Number(compact.slice(0, 4));
+        const month = Number(compact.slice(4, 6));
+        const day = Number(compact.slice(6, 8));
+        const parts = buildParts(year, month, day, 0, 0, 0, 0, true, false);
+        if (parts && isMetaBirthYear(year)) return compact;
+        if (/^\d{8}$/.test(text.trim())) return null;
+    }
+
+    const parts = parseTemporal(value);
+    if (!parts || !parts.hasDate || !isMetaBirthYear(parts.year)) return null;
+
+    return `${pad(parts.year, 4)}${pad(parts.month)}${pad(parts.day)}`;
+}
+
+function formatMetaGender(value: string): string | null {
+    const gender = compactMetaText(value);
+    if (gender === 'f' || gender === 'female') return 'f';
+    if (gender === 'm' || gender === 'male') return 'm';
+    return null;
+}
+
+function formatMetaState(value: string): string | null {
+    const state = compactMetaText(value);
+    if (state === null) return null;
+    return META_US_STATE_CODES[state] ?? state;
+}
+
+function formatMetaPostalCode(value: string): string | null {
+    const postalCode = compactMetaText(value);
+    if (postalCode === null) return null;
+    return /^\d{9}$/.test(postalCode) ? postalCode.slice(0, 5) : postalCode;
+}
+
+function compactMetaText(value: string): string | null {
+    const compact = value
+        .trim()
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, '');
+    return compact === '' ? null : compact;
+}
+
+function isMetaBirthYear(year: number): boolean {
+    return year >= 1900 && year <= new Date().getUTCFullYear();
 }
 
 function formatEmail(value: unknown, format: string): string | null {

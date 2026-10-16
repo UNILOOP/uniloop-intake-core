@@ -15,7 +15,9 @@ export class GoogleAdsProvider implements AnalyticsProvider {
         hipaaFilter?: boolean;
         debug?: boolean;
     }): Promise<void> {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
         const conversionId = (config.conversionId ?? this.mappedConversionId(config.eventMappings) ?? '').trim().toUpperCase();
+        if (!conversionId) return;
         if (!/^AW-[0-9]{4,20}$/.test(conversionId)) {
             throw new Error('Google Ads conversion ID must use the AW-123456789 format.');
         }
@@ -32,7 +34,7 @@ export class GoogleAdsProvider implements AnalyticsProvider {
                 window.dataLayer!.push(arguments as any);
             };
 
-        if (!document.querySelector(`script[src*="gtag/js?id=${this.conversionId}"]`)) {
+        if (!document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) {
             const script = document.createElement('script');
             script.async = true;
             script.src = `https://www.googletagmanager.com/gtag/js?id=${this.conversionId}`;
@@ -51,6 +53,23 @@ export class GoogleAdsProvider implements AnalyticsProvider {
         if (!this.initialized || !window.gtag) return;
         const mapping = this.eventMappings?.events?.[event.action]?.google_ads;
         this.fireConversion(event, mapping);
+        for (const custom of this.eventMappings?.custom_events ?? []) {
+            if (custom.trigger_event !== event.action) continue;
+            const condition = custom.condition;
+            const clauses = condition?.all ?? (condition?.path ? [condition] : []);
+            if (!clauses.every((clause) => {
+                const value = clause.path?.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined, event);
+                const expected = clause.value;
+                switch (clause.op ?? 'equals') {
+                    case 'equals': return value == expected;
+                    case 'not_equals': return value != expected;
+                    case 'in': return Array.isArray(expected) && expected.some((entry) => entry == value);
+                    case 'not_in': return Array.isArray(expected) && !expected.some((entry) => entry == value);
+                    default: return false;
+                }
+            })) continue;
+            this.fireConversion(event, custom.channels.google_ads);
+        }
     }
 
     trackPageView(url: string, title?: string, additionalData?: Record<string, any>): void {
@@ -83,6 +102,10 @@ export class GoogleAdsProvider implements AnalyticsProvider {
             !conversionLabel ||
             !/^[A-Za-z0-9_-]+$/.test(conversionLabel)
         ) return;
+        const browser = window as unknown as { UNILOOP_PIXEL_REQUIRED?: boolean; UNILOOP_PIXEL_STATE?: { ready?: boolean; requires_consent?: boolean; consent?: Record<string, boolean> } };
+        const category = mapping?.consent_category ?? 'marketing';
+        if (browser.UNILOOP_PIXEL_REQUIRED && category !== 'necessary'
+            && !(browser.UNILOOP_PIXEL_STATE?.ready && !browser.UNILOOP_PIXEL_STATE.requires_consent && browser.UNILOOP_PIXEL_STATE.consent?.[category])) return;
 
         const canonicalPayload: Record<string, unknown> = {
             ...(event.metadata ?? {}),

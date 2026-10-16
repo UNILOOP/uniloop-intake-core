@@ -19,7 +19,7 @@ export interface AnalyticsEventMappings {
     custom_events?: Array<{
         key: string;
         trigger_event: string;
-        condition?: { path?: string; op?: string; value?: unknown } | null;
+        condition?: { path?: string; op?: string; value?: unknown; all?: Array<{ path?: string; op?: string; value?: unknown }> } | null;
         channels: Record<string, AnalyticsChannelMapping>;
     }>;
 }

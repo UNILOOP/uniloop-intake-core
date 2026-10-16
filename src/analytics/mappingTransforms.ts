@@ -1,5 +1,5 @@
 import type { AnalyticsChannelMapping } from './types';
-import { FIELD_MAP_LEVEL_ROOT, formatFieldValue, normalizeExtraFields, normalizeFieldMap, sha256, setOutputPath } from './fieldFormats';
+import { FIELD_MAP_LEVEL_ROOT, formatFieldValuePipeline, normalizeExtraFields, normalizeFieldMap, sha256, setOutputPath } from './fieldFormats';
 import { filterHipaaPayload } from './hipaaFilter';
 
 export function buildMappedAnalyticsPayload(
@@ -32,9 +32,11 @@ export function buildMappedAnalyticsPayload(
             continue;
         }
         removeValue(out, sourceKey);
-        // Format runs on the raw canonical value, before hashing, so a hashed
-        // phone/email is hashed in its normalised form — same as the server.
-        setOutputPath(out, entry.to, clonePayload(entry.type && entry.format ? formatFieldValue(value.value, entry.type, entry.format) : value.value));
+        // Every format runs on the previous output. Per-row and channel-level
+        // hashing happen later, after the ordered pipeline and drop rules.
+        setOutputPath(out, entry.to, clonePayload(entry.type && entry.formats.length > 0
+            ? formatFieldValuePipeline(value.value, entry.type, entry.formats)
+            : value.value));
         if (entry.level === FIELD_MAP_LEVEL_ROOT) {
             rootKeys.add(entry.to.split('.')[0]);
         }
@@ -51,7 +53,13 @@ export function buildMappedAnalyticsPayload(
 
     pruneEmptyContainers(out);
 
-    const hashedTargets = new Set(Object.values(entries).filter((entry) => entry.format === 'hashed').map((entry) => entry.to));
+    const hashedTargets = new Set<string>();
+    for (const entry of Object.values(entries)) {
+        if (entry.hash && !protectedSet.has(entry.to)) {
+            hashedTargets.add(entry.to);
+            hashValueAt(out, entry.to);
+        }
+    }
     for (const key of [...(mapping?.hash_keys ?? []), ...globalHashes]) {
         const targetKey = entries[key]?.to ?? key;
         if (!protectedSet.has(targetKey) && !hashedTargets.has(targetKey)) {

@@ -41,7 +41,9 @@ export interface FieldValueTypeDescriptor {
 /**
  * The full catalog, in the order the editor lists it. The first format of
  * each type is the default the editor picks when the type is chosen. Format
- * ids must match AnalyticsFieldValueType::formats() on the backend.
+ * ids must match AnalyticsFieldValueType::formats() on the backend. Hashing
+ * is intentionally not a format: a field-map entry opts into SHA-256 with its
+ * independent `hash` flag after all selected formats have run.
  */
 export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
     {
@@ -128,10 +130,6 @@ export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
     },
 ];
 
-for (const descriptor of FIELD_VALUE_TYPE_CATALOG) {
-    descriptor.formats.push({ id: 'hashed', label: 'Hashed (SHA-256)', example: 'trim + lowercase → SHA-256' });
-}
-
 const CATALOG_BY_TYPE: Record<string, FieldValueTypeDescriptor> = Object.fromEntries(
     FIELD_VALUE_TYPE_CATALOG.map((descriptor) => [descriptor.id, descriptor]),
 );
@@ -163,6 +161,11 @@ export interface FieldMapEntry {
     to: string;
     level?: FieldMapLevel;
     type?: FieldValueType;
+    /** Ordered formatting pipeline. Each output becomes the next format's input. */
+    formats?: string[];
+    /** SHA-256 the fully formatted value before sending it. */
+    hash?: boolean;
+    /** @deprecated Legacy single-format shape; accepted for saved mappings. */
     format?: string;
 }
 
@@ -172,7 +175,8 @@ export interface NormalizedFieldMapEntry {
     to: string;
     level: FieldMapLevel;
     type: FieldValueType | null;
-    format: string | null;
+    formats: string[];
+    hash: boolean;
 }
 
 /**
@@ -203,7 +207,9 @@ export interface NormalizedExtraFieldEntry {
  */
 export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | null {
     if (typeof raw === 'string') {
-        return !isValidOutputPath(raw) ? null : { to: raw, level: FIELD_MAP_LEVEL_NESTED, type: null, format: null };
+        return !isValidOutputPath(raw)
+            ? null
+            : { to: raw, level: FIELD_MAP_LEVEL_NESTED, type: null, formats: [], hash: false };
     }
     if (!isRecord(raw)) return null;
 
@@ -211,13 +217,23 @@ export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | 
     if (typeof to !== 'string' || !isValidOutputPath(to)) return null;
 
     const level: FieldMapLevel = raw.level === 0 || raw.level === '0' ? FIELD_MAP_LEVEL_ROOT : FIELD_MAP_LEVEL_NESTED;
-    const hasFormat = isFieldValueType(raw.type) && isValidFieldFormat(raw.type, raw.format);
+    const type = isFieldValueType(raw.type) ? raw.type : null;
+    const legacyHash = raw.format === 'hashed';
+    const rawFormats = Array.isArray(raw.formats)
+        ? raw.formats
+        : raw.format !== undefined && !legacyHash
+          ? [raw.format]
+          : [];
+    const formats = type === null
+        ? []
+        : rawFormats.filter((format): format is string => isValidFieldFormat(type, format));
 
     return {
         to,
         level,
-        type: hasFormat ? (raw.type as FieldValueType) : null,
-        format: hasFormat ? (raw.format as string) : null,
+        type: formats.length > 0 || legacyHash ? type : null,
+        formats,
+        hash: raw.hash === true || legacyHash,
     };
 }
 
@@ -240,15 +256,16 @@ export function normalizeFieldMap(fieldMap: Record<string, unknown> | undefined 
  * legacy string when it is a plain rename, the object otherwise.
  */
 export function serializeFieldMapEntry(entry: NormalizedFieldMapEntry): FieldMapValue {
-    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.type === null) {
+    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.formats.length === 0 && !entry.hash) {
         return entry.to;
     }
     const out: FieldMapEntry = { to: entry.to };
     if (entry.level === FIELD_MAP_LEVEL_ROOT) out.level = FIELD_MAP_LEVEL_ROOT;
-    if (entry.type !== null && entry.format !== null) {
+    if (entry.type !== null && entry.formats.length > 0) {
         out.type = entry.type;
-        out.format = entry.format;
+        out.formats = [...entry.formats];
     }
+    if (entry.hash) out.hash = true;
     return out;
 }
 
@@ -414,10 +431,6 @@ export function formatFieldValue(value: unknown, type: FieldValueType, format: s
         return value.map((item) => formatFieldValue(item, type, format));
     }
 
-    if (format === 'hashed') {
-        return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? sha256(value) : value;
-    }
-
     let formatted: unknown;
     switch (type) {
         case 'phone':
@@ -447,6 +460,15 @@ export function formatFieldValue(value: unknown, type: FieldValueType, format: s
     }
 
     return formatted === null || formatted === undefined ? value : formatted;
+}
+
+/**
+ * Apply an ordered formatting pipeline. Each formatter receives the output of
+ * the previous formatter; hashing is a separate field-map step performed by
+ * the payload mapper after this pipeline completes.
+ */
+export function formatFieldValuePipeline(value: unknown, type: FieldValueType, formats: readonly string[]): unknown {
+    return formats.reduce((formatted, format) => formatFieldValue(formatted, type, format), value);
 }
 
 function formatPhone(value: unknown, format: string): string | null {

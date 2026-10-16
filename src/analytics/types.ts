@@ -31,7 +31,7 @@ export interface AnalyticsChannelMapping {
     name?: string;
     /**
      * Canonical source key → output key (string shorthand) or a field-map
-     * entry object `{ to, level, type, format }`; see fieldFormats.ts.
+     * entry object `{ to, level, type, formats, hash }`; see fieldFormats.ts.
      */
     field_map?: Record<string, FieldMapValue>;
     drop_keys?: string[];

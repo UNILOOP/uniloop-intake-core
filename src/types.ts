@@ -43,6 +43,8 @@ export type OutputSchemaArray = {
   type: 'array';
   items: {
     type: 'string' | 'number' | 'boolean' | 'object';
+    // What the strings hold when it isn't free text, e.g. 'uri' for file links (JSON Schema's format)
+    format?: string;
   };
 };
 

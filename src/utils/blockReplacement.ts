@@ -47,13 +47,13 @@ function resolveOutput(schema: OutputSchema | undefined, blockData?: BlockData):
 
 /**
  * Check whether answers shaped like `next` can stand in for answers shaped like `current`:
- * the same scalar type, the same array item type, or for objects every property of
- * `current` with the same type. An object without declared properties, whose keys
+ * the same scalar type, the same array item type and format, or for objects every property
+ * of `current` with the same type. An object without declared properties, whose keys
  * come from the block's configuration, only matches another such object.
  */
 function outputFits(current: ResolvedOutputSchema, next: ResolvedOutputSchema): boolean {
   if (current.type === 'array' && next.type === 'array') {
-    return current.items.type === next.items.type;
+    return current.items.type === next.items.type && current.items.format === next.items.format;
   }
 
   if (current.type === 'object' && next.type === 'object') {

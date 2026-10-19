@@ -14,8 +14,9 @@ export function buildMappedAnalyticsPayload(
     // rename/format → drop (matched on the post-rename keys) → hash → HIPAA
     // filter on the output keys (when the channel asks for it) → static
     // fields → level-0 keys first. A rename therefore wins over a drop or a
-    // HIPAA rule that names its SOURCE key; only the output key is judged
-    // afterwards. Entries carry the output key plus an optional value format;
+    // HIPAA rule that names its SOURCE key. Hashed output paths are protected
+    // so vendor-required PII-like names can carry only the transformed value.
+    // Entries carry the output key plus an optional value format;
     // whether a level-0 key is hoisted out of the flat object is up to the
     // caller (see splitRootLevelKeys), since only the caller knows its envelope.
     const entries = normalizeFieldMap(mapping?.field_map);
@@ -69,7 +70,7 @@ export function buildMappedAnalyticsPayload(
     }
 
     // Static fields are merchant literals, never PHI, so they merge after the filter.
-    const filtered = hipaaFilter ? filterHipaaPayload(out, protectedKeys) : out;
+    const filtered = hipaaFilter ? filterHipaaPayload(out, [...protectedKeys, ...hashedTargets]) : out;
 
     for (const [key, entry] of Object.entries(normalizeExtraFields(mapping?.extra_fields))) {
         setOutputPath(filtered, key, clonePayload(entry.value));

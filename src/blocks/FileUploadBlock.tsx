@@ -764,12 +764,13 @@ export const FileUploadBlock: BlockDefinition = {
   },
   inputSchema: {
     type: 'array',
-    items: { type: 'string' },
+    items: { type: 'string', format: 'uri' },
   },
-  // Output schema - this block returns an array of strings (file URLs)
+  // Output schema - this block returns an array of strings (file URLs). The 'uri' format keeps
+  // Replace from offering it for a multi-select, whose strings are option values.
   outputSchema: {
     type: 'array',
-    items: { type: 'string' },
+    items: { type: 'string', format: 'uri' },
   },
   fieldConfig: {
     enabled: true,

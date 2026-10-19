@@ -7,7 +7,9 @@ import type {
   ThemeDefinition,
   BlockDefinition,
 } from '../../../types';
-import { getBlockDefinition } from '../../../blocks';
+import { resolveBlockDefinition } from '../../../blocks';
+import { useBlockOverrideFailures } from '../../renderers/BlockOverrideBoundary';
+import { useSurveyForm } from '../../../context/SurveyFormContext';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Textarea } from '../../../components/ui/textarea';
@@ -59,7 +61,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [localValue, setLocalValue] = useState(value ?? '');
 
   // Get block definition to check for chatRenderer
-  const blockDefinition = getBlockDefinition(block.type);
+  const { blockOverrides } = useSurveyForm();
+  // Look the block up again once an override fails, so the system block's input is used.
+  useBlockOverrideFailures();
+  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
 
   // Sync local value with prop value
   useEffect(() => {

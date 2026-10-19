@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useSurveyForm } from '../../../context/SurveyFormContext';
 import { getSurveyPages, detectSurveyMode } from '../../../utils/surveyUtils';
-import { getBlockDefinition } from '../../../blocks';
+import { resolveBlockDefinition } from '../../../blocks';
 import type { BlockData, BlockDefinition } from '../../../types';
 import type {
   ChatLayoutProps,
@@ -102,6 +102,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
     theme,
     surveyData,
     customData,
+    blockOverrides,
     getVisibleBlocks,
     getTotalVisibleSteps,
     getCurrentStepPosition,
@@ -181,7 +182,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
       blockFunctions?: BlockFunction[];
       definition?: ExtendedBlockDefinition;
     } => {
-      const definition = getBlockDefinition(block.type) as
+      const definition = resolveBlockDefinition(block.type, blockOverrides) as
         | ExtendedBlockDefinition
         | undefined;
       return {
@@ -190,7 +191,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
         definition,
       };
     },
-    []
+    [blockOverrides]
   );
 
   // Generate AI question for a specific field in multi-field mode

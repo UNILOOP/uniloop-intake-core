@@ -2699,6 +2699,8 @@ A change is refused when its path and a locked path overlap, so adding, removing
 
 A locked block's links are fixed with its settings: when its definition locks `navigationRules`, `nextBlockId` or `isEndBlock`, the flow view hides the controls that would change them, including inserting a block on them. When a block it links to is deleted, the link moves on to where the deleted block led.
 
+With [`blockOverrides`](#overriding-a-system-block), the builder edits the override's settings, so the override's own `lockAccess` applies, not the built-in block's. An override without `lockAccess` can't change at all while locked; give it one to keep its wording editable.
+
 In a custom block's settings form, `useBlockLock()` gives `locked`, `fullyLocked` and `isLocked(path)`, so the form can disable what the lock fixes. The builder refuses those changes either way, but without it the inputs still look editable. Call it from a component that `renderFormFields` renders:
 
 ```tsx

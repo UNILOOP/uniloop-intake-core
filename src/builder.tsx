@@ -78,4 +78,5 @@ export type {
   SurveyMode,
   EditorMode,
   ContentBlockItemProps,
+  BlockOverrides,
 } from './types';

@@ -1,8 +1,9 @@
 import type React from "react";
-import { createContext, useContext, useReducer, type ReactNode } from "react"
+import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react"
 import { v4 as uuidv4 } from "uuid";
 import {
   type BlockDefinition,
+  type BlockOverrides,
   type GlobalCustomField,
   type LocalizationMap,
   type NodeData,
@@ -14,6 +15,7 @@ import {
   type SurveyMode
 } from "../types";
 import { uniloop as uniTheme } from "../themes";
+import { findBlockOverride, pinBlockOverride } from "../blocks";
 import { getRuleOutputKeys, isObjectOutput } from "../utils/outputSchema";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
@@ -25,6 +27,29 @@ export const useSurveyBuilder = () => {
   }
   return context;
 };
+
+/**
+ * Returns the block definitions with each mapped system type replaced by its
+ * override, looked up in the builder's definitions first, then the registry.
+ * Only system blocks the builder already has are replaced. Returns `blocks`
+ * itself when nothing is replaced.
+ */
+function applyBlockOverrides(
+  blocks: Record<string, BlockDefinition> | undefined,
+  overrides: BlockOverrides | undefined
+): Record<string, BlockDefinition> | undefined {
+  if (!overrides || !blocks) return blocks;
+  let effectiveBlocks: Record<string, BlockDefinition> | null = null;
+  for (const [systemType, overrideType] of Object.entries(overrides)) {
+    const system = Object.hasOwn(blocks, systemType) ? blocks[systemType] : undefined;
+    if (!system || typeof overrideType !== "string" || overrideType === systemType) continue;
+    const override = findBlockOverride(systemType, overrideType, system, blocks);
+    if (!override) continue;
+    if (!effectiveBlocks) effectiveBlocks = { ...blocks };
+    effectiveBlocks[systemType] = pinBlockOverride(systemType, system, override);
+  }
+  return effectiveBlocks ?? blocks;
+}
 
 // Initial state
 const initialState: SurveyBuilderState = {
@@ -377,6 +402,8 @@ interface SurveyBuilderContextType {
   customData: any;
   /** Hides the "Lock block" control in block settings. */
   hideBlockLockControls: boolean;
+  /** System block type to the registered block type that replaces it. */
+  blockOverrides?: BlockOverrides;
   // Field collection utilities (includes nested fields from output schemas)
   getAvailableFields: (currentBlockId: string) => string[];
   getAvailableFieldsBefore: (currentBlockId: string) => string[];
@@ -400,6 +427,8 @@ interface SurveyBuilderProviderProps {
   customData?: any;
   /** Hides the "Lock block" control in block settings. Locked blocks stay locked. */
   hideBlockLockControls?: boolean;
+  /** System block type to the registered block type that replaces it. */
+  blockOverrides?: BlockOverrides;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -415,6 +444,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   enableDebug = false,
   customData,
   hideBlockLockControls = false,
+  blockOverrides,
   mode = 'pageless',
 }) => {
   const [state, dispatch] = useReducer(
@@ -428,6 +458,22 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
       customData,
       mode,
     }
+  );
+
+  // Builder surfaces read block definitions from the context state, so each
+  // override shows wherever the system block it replaces would. The blocks
+  // record only changes when the definitions or the mapping do.
+  const stateBlocks = state.definitions?.blocks;
+  const effectiveBlocks = useMemo(
+    () => applyBlockOverrides(stateBlocks, blockOverrides),
+    [stateBlocks, blockOverrides]
+  );
+  const effectiveState = useMemo<SurveyBuilderState>(
+    () =>
+      effectiveBlocks === stateBlocks
+        ? state
+        : { ...state, definitions: { ...state.definitions, blocks: effectiveBlocks } },
+    [state, stateBlocks, effectiveBlocks]
   );
 
   // Helper functions
@@ -639,7 +685,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         names.push(item.fieldName);
 
         // Check if this block has an output schema with nested fields
-        const blockDefinition = state.definitions?.blocks?.[item.type];
+        const blockDefinition = effectiveState.definitions?.blocks?.[item.type];
         if (blockDefinition && item.fieldName) {
           // Check if block outputs an object (which may have nested fields)
           if (isObjectOutput(blockDefinition, item)) {
@@ -719,7 +765,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         fieldNames.push(node.fieldName);
 
         // Add nested fields from output schema
-        const blockDefinition = state.definitions?.blocks?.[node.type];
+        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
             const outputKeys = getRuleOutputKeys(blockDefinition, node);
@@ -777,7 +823,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         fieldNames.push(node.fieldName);
 
         // Add nested fields from output schema
-        const blockDefinition = state.definitions?.blocks?.[node.type];
+        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
             const outputKeys = getRuleOutputKeys(blockDefinition, node);
@@ -831,7 +877,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         fieldNames.push(node.fieldName);
 
         // Add nested fields from output schema
-        const blockDefinition = state.definitions?.blocks?.[node.type];
+        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
         if (blockDefinition) {
           if (isObjectOutput(blockDefinition, node)) {
             const outputKeys = getRuleOutputKeys(blockDefinition, node);
@@ -864,7 +910,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   };
 
   const value = {
-    state,
+    state: effectiveState,
     dispatch,
     addBlockDefinition,
     addNodeDefinition,
@@ -882,6 +928,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     setCustomData,
     customData: state.customData,
     hideBlockLockControls,
+    blockOverrides,
     getAvailableFields,
     getAvailableFieldsBefore,
     getAvailableFieldsUptoCurrent,

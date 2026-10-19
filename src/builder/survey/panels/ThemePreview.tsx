@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui
 import { Button } from "../../../components/ui/button";
 import { Package, Sun, Moon, Monitor, Smartphone, Tablet, Laptop, Monitor as MonitorIcon } from "lucide-react";
 import { SurveyForm } from "../../../renderer/SurveyForm";
+import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { ThemeDefinition, SurveyBuilderState } from "../../../types";
 import type { LayoutProps } from "../../../types";
 
@@ -17,6 +18,7 @@ interface ThemePreviewProps {
 }
 
 const ThemePreview: React.FC<ThemePreviewProps> = ({ theme, state, layout, logo = null }) => {
+  const { blockOverrides } = useSurveyBuilder();
   const [surveyThemeMode, setSurveyThemeMode] = useState<ThemeMode>('light');
   const [previewWidth, setPreviewWidth] = useState(400);
 
@@ -120,6 +122,7 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ theme, state, layout, logo 
                 theme={theme.name}
                 themeMode={surveyThemeMode}
                 customData={state.customData}
+                blockOverrides={blockOverrides}
                 logo={logo}
                 progressBar={{
                   type: 'percentage',

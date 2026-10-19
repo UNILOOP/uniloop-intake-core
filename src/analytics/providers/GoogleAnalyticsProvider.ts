@@ -36,10 +36,7 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
       await loadGoogleAnalyticsNative(this.measurementId, this.debug);
       this.initialized = true;
       
-      // Add session and user configuration if needed
-      if (this.sessionId || this.userId) {
-        this.configureGA();
-      }
+      this.configureGA();
       
       if (this.debug) {
         console.log('[GoogleAnalytics] Initialized successfully using native loader');
@@ -173,8 +170,8 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
     const config: any = {
       send_page_view: false, // We'll handle page views manually
       debug_mode: this.debug,
-      // Enable enhanced measurement
-      allow_google_signals: true,
+      // Measurement only: do not enable Google's advertising features.
+      allow_google_signals: false,
       allow_ad_personalization_signals: false
     };
 
@@ -265,7 +262,7 @@ export class GoogleAnalyticsProvider implements AnalyticsProvider {
         }
       : eventData;
     Object.keys(canonicalData).forEach((key) => canonicalData[key] === undefined && delete canonicalData[key]);
-    const payload = buildMappedAnalyticsPayload(canonicalData, mapping, globalDrops, globalHashes, [], this.hipaaFilter);
+    const payload = buildMappedAnalyticsPayload(canonicalData, mapping, globalDrops, globalHashes, [], mapping?.hipaa_filter ?? this.hipaaFilter);
     window.gtag('event', mapping?.name ?? event.action, payload);
 
     if (this.debug) {

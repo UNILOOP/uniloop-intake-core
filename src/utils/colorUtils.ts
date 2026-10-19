@@ -11,8 +11,22 @@ const VARIANT_PSEUDOS: Record<string, string> = {
   active: ':active',
   disabled: ':disabled',
   'focus-visible': ':focus-visible',
+  'focus-within': ':focus-within',
   checked: ':checked',
 };
+
+// Rules only match inside a rendered survey, so a host page that uses the same
+// class keeps its own styles. :where() adds no specificity, so inside the survey
+// the rules cascade exactly as they did before they were scoped.
+const SURVEY_SCOPE = ':where(.survey-theme-container)';
+
+const STYLE_ID = 'dynamic-color-styles';
+
+// Rules already inserted, per stylesheet. The sheet's own rules can't be
+// checked instead: the browser normalises cssText, so rgba(..., 1) reads back
+// as rgb(...). Moving the style tag gives it a new, empty sheet, which starts
+// with no entries here.
+const insertedRules = new WeakMap<CSSStyleSheet, Set<string>>();
 
 // Properly escape CSS class name special characters
 function escapeCSSSelector(className: string): string {
@@ -24,34 +38,34 @@ function escapeCSSSelector(className: string): string {
     .replace(/\//g, '\\/');
 }
 
+// Adds CSS for the theme's arbitrary hex colour classes (bg-[#1C1C1C],
+// hover:text-[#948EC4]) that the host's Tailwind build may not include.
 export function applyDynamicColors(theme: any) {
   if (typeof document === 'undefined' || !theme) return;
 
-  const styleId = 'dynamic-color-styles';
-  let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
+  let styleTag = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 
   if (!styleTag) {
     styleTag = document.createElement('style');
-    styleTag.id = styleId;
+    styleTag.id = STYLE_ID;
     document.head.appendChild(styleTag);
   }
 
   const sheet = styleTag.sheet as CSSStyleSheet;
-  const existing = new Set<string>();
-
-  for (let i = 0; i < sheet.cssRules.length; i++) {
-    existing.add(sheet.cssRules[i].cssText);
+  let inserted = insertedRules.get(sheet);
+  if (!inserted) {
+    inserted = new Set();
+    insertedRules.set(sheet, inserted);
   }
 
   const addRule = (selector: string, rule: string) => {
     const text = `${selector}{${rule}}`;
-    if (!existing.has(text)) {
-      try {
-        sheet.insertRule(text, sheet.cssRules.length);
-        existing.add(text);
-      } catch (error) {
-        console.warn(`Failed to insert CSS rule: ${text}`, error);
-      }
+    if (inserted.has(text)) return;
+    try {
+      sheet.insertRule(text, sheet.cssRules.length);
+      inserted.add(text);
+    } catch (error) {
+      console.warn(`Failed to insert CSS rule: ${text}`, error);
     }
   };
 
@@ -65,10 +79,12 @@ export function applyDynamicColors(theme: any) {
         const alpha = match[4] ? parseInt(match[4], 10) / 100 : 1;
         const rgba = hexToRgba(color, alpha);
 
-        let selector = `.${escapeCSSSelector(cls)}`;
-        if (variant && VARIANT_PSEUDOS[variant]) {
-          selector += VARIANT_PSEUDOS[variant];
-        }
+        // A prefix that isn't a plain pseudo-class (dark:, md:, group-hover:) is
+        // left to the host's Tailwind build instead of being applied always.
+        const pseudo = variant ? VARIANT_PSEUDOS[variant] : '';
+        if (typeof pseudo !== 'string') return;
+
+        const selector = `${SURVEY_SCOPE} .${escapeCSSSelector(cls)}${pseudo}`;
 
         const prop =
           type === 'text'

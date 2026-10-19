@@ -12,6 +12,11 @@ export const GoogleAnalyticsScript: React.FC<GoogleAnalyticsScriptProps> = ({ me
 
     // Check if already loaded
     if (window.gtag) {
+      window.gtag('config', measurementId, {
+        send_page_view: false,
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
+      });
       if (debug) {
         console.log('[GA Script] gtag already exists, skipping initialization');
       }
@@ -38,6 +43,8 @@ export const GoogleAnalyticsScript: React.FC<GoogleAnalyticsScriptProps> = ({ me
       // Configure GA
       window.gtag('config', measurementId, {
         send_page_view: false,
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
         debug_mode: debug
       });
 
@@ -73,6 +80,8 @@ export const GoogleAnalyticsScript: React.FC<GoogleAnalyticsScriptProps> = ({ me
       gtag('js', new Date());
       gtag('config', '${measurementId}', {
         send_page_view: false,
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
         debug_mode: ${debug}
       });
     `;
@@ -121,6 +130,8 @@ export const loadGoogleAnalyticsNative = (measurementId: string, debug?: boolean
         gtag('js', new Date());
         gtag('config', '${measurementId}', {
           send_page_view: false,
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false,
           debug_mode: ${debug || false}
         });
       `;

@@ -19,7 +19,7 @@ export interface AnalyticsEventMappings {
     custom_events?: Array<{
         key: string;
         trigger_event: string;
-        condition?: { path?: string; op?: string; value?: unknown } | null;
+        condition?: { path?: string; op?: string; value?: unknown; all?: Array<{ path?: string; op?: string; value?: unknown }> } | null;
         channels: Record<string, AnalyticsChannelMapping>;
     }>;
 }
@@ -27,10 +27,12 @@ export interface AnalyticsEventMappings {
 export interface AnalyticsChannelMapping {
     consent_category?: 'necessary' | 'preferences' | 'analytics' | 'marketing' | null;
     enabled?: boolean;
+    hipaa_filter?: boolean;
     name?: string;
+    conversion_id?: string | null;
     /**
      * Canonical source key → output key (string shorthand) or a field-map
-     * entry object `{ to, level, type, format }`; see fieldFormats.ts.
+     * entry object `{ to, level, type, formats, hash }`; see fieldFormats.ts.
      */
     field_map?: Record<string, FieldMapValue>;
     drop_keys?: string[];
@@ -68,6 +70,12 @@ export interface AnalyticsConfig {
     // Google Analytics configuration
     googleAnalytics?: {
         measurementId: string;
+        eventMappings?: AnalyticsEventMappings;
+        hipaaFilter?: boolean;
+        debug?: boolean;
+    };
+    googleAds?: {
+        conversionId?: string;
         eventMappings?: AnalyticsEventMappings;
         hipaaFilter?: boolean;
         debug?: boolean;

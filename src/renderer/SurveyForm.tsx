@@ -57,6 +57,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   abTestPreviewMode = false,
   analytics,
   customData,
+  blockOverrides,
   mode,
 }) => {
   // Track render count to diagnose re-render issues
@@ -295,6 +296,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       googleAnalytics: analytics.googleAnalytics
         ? { ...analytics.googleAnalytics, eventMappings: analytics.googleAnalytics.eventMappings ?? mappings }
         : undefined,
+      googleAds: analytics.googleAds
+        ? { ...analytics.googleAds, eventMappings: analytics.googleAds.eventMappings ?? mappings }
+        : undefined,
       googleTagManager: analytics.googleTagManager
         ? { ...analytics.googleTagManager, eventMappings: analytics.googleTagManager.eventMappings ?? mappings }
         : undefined,
@@ -316,6 +320,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
     () =>
       analytics?.enabled !== false &&
       (analytics?.googleAnalytics ||
+        analytics?.googleAds ||
         analytics?.googleTagManager ||
         analytics?.meta ||
         (analytics?.customPixels?.pixels && analytics.customPixels.pixels.length > 0) ||
@@ -378,6 +383,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             abTestPreviewMode={abTestPreviewMode}
             analytics={analytics}
             customData={customData}
+            blockOverrides={blockOverrides}
             mode={mode ?? survey.mode}
           >
             <LayoutComponent {...layoutProps} />

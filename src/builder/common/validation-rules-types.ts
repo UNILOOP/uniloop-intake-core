@@ -155,6 +155,13 @@ export function validationRuleToFunction(rule: ValidationRule): (value: any, for
         case 'in':
         case 'notIn': {
           const arrayValue = Array.isArray(ruleValue) ? ruleValue : [ruleValue];
+          if (Array.isArray(valueToValidate)) {
+            // A multi select answer is in the list when all its choices are, and not in it when none are
+            const passes = operator === 'in'
+              ? valueToValidate.every(v => arrayValue.includes(v))
+              : !valueToValidate.some(v => arrayValue.includes(v));
+            return passes ? null : message;
+          }
           const isIn = arrayValue.includes(valueToValidate);
           return (operator === 'in' ? isIn : !isIn) ? null : message;
         }
@@ -345,18 +352,23 @@ export function validationRuleToFunction(rule: ValidationRule): (value: any, for
           return (ageInYears >= Number(minAge) && ageInYears <= Number(maxAge)) ? null : message;
         }
         
-        default:
+        default: {
           // Handle standard comparison operators
           // '==' is a TRIGGER: if value matches, validation FAILS (e.g. disqualify specific value)
           // All others are CONSTRAINTS: condition must be true for validation to PASS
           const compareValue = ruleValue;
+          // A multi select answer equals X when X is one of its choices, so picking
+          // another option alongside a disqualifying one doesn't get past the rule
+          const equals = Array.isArray(valueToValidate)
+            ? valueToValidate.some(v => v == compareValue)
+            : valueToValidate == compareValue;
           switch (operator) {
             case '==':
               // Trigger: "if value equals X, show error" (e.g. disqualify "yes")
-              return valueToValidate == compareValue ? message : null;
+              return equals ? message : null;
             case '!=':
               // Constraint: "value must not equal X" (e.g. must not be "Pregnant")
-              return valueToValidate != compareValue ? null : message;
+              return !equals ? null : message;
             case '>':
               return Number(valueToValidate) > Number(compareValue) ? null : message;
             case '>=':
@@ -368,6 +380,7 @@ export function validationRuleToFunction(rule: ValidationRule): (value: any, for
             default:
               return null;
           }
+        }
       }
     } catch (error) {
       console.error('Validation rule error:', error);

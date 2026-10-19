@@ -43,6 +43,8 @@ export type OutputSchemaArray = {
   type: 'array';
   items: {
     type: 'string' | 'number' | 'boolean' | 'object';
+    // What the strings hold when it isn't free text, e.g. 'uri' for file links (JSON Schema's format)
+    format?: string;
   };
 };
 
@@ -349,6 +351,12 @@ export interface NavigationHistoryEntry {
   trigger: 'forward' | 'back' | 'jump' | 'initial';
 }
 
+/**
+ * Maps a system block type to the registered block type that renders in its
+ * place, e.g. `{ yesNoAnswer: 'myYesNo' }`.
+ */
+export type BlockOverrides = Record<string, string>;
+
 export interface SurveyFormRendererProps {
   survey: {
     rootNode: NodeData;
@@ -411,6 +419,12 @@ export interface SurveyFormRendererProps {
       hipaaFilter?: boolean;
       debug?: boolean;
     };
+    googleAds?: {
+      conversionId?: string;
+      eventMappings?: import('./analytics/types').AnalyticsEventMappings;
+      hipaaFilter?: boolean;
+      debug?: boolean;
+    };
     googleTagManager?: {
       containerId: string;
       auth?: string;
@@ -447,6 +461,14 @@ export interface SurveyFormRendererProps {
   };
   // Custom data for custom blocks
   customData?: any;
+  /**
+   * Replaces system blocks with registered blocks, keyed by system block type,
+   * e.g. `{ yesNoAnswer: 'myYesNo' }`. Wherever a mapped block appears, the
+   * registered block renders and validates in its place, and the form keeps
+   * the system type. If the mapped block isn't registered, has no
+   * `renderBlock`, or throws while rendering, the system block is shown.
+   */
+  blockOverrides?: BlockOverrides;
 }
 
 
@@ -591,6 +613,7 @@ export interface SurveyFormContextProps {
     trackTimings?: boolean;
   };
   customData?: any;
+  blockOverrides?: BlockOverrides;
 }
 
 // New interfaces for conditional branching and validation

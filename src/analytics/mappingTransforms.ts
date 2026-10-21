@@ -28,11 +28,14 @@ export function buildMappedAnalyticsPayload(
         if (protectedSet.has(sourceKey)) {
             continue;
         }
-        const value = getValue(payload, sourceKey);
-        if (!value.exists) {
-            continue;
-        }
-        removeValue(out, sourceKey);
+        const sources = entry.sources ?? [sourceKey];
+        const values = sources.map((source) => getValue(payload, source));
+        if (values.some((value) => !value.exists)) continue;
+        if (entry.sources && values.some((value) => value.value == null || !['string', 'number', 'boolean'].includes(typeof value.value))) continue;
+        const value = entry.sources
+            ? { exists: true, value: values.map((part) => String(part.value)).join(entry.separator ?? '') }
+            : values[0];
+        if (!entry.sources) removeValue(out, sourceKey);
         // Every format runs on the previous output. Per-row and channel-level
         // hashing happen later, after the ordered pipeline and drop rules.
         setOutputPath(out, entry.to, clonePayload(entry.type && entry.formats.length > 0

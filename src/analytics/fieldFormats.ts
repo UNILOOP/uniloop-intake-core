@@ -160,6 +160,9 @@ export const FIELD_MAP_LEVEL_NESTED: FieldMapLevel = 1;
  */
 export interface FieldMapEntry {
     to: string;
+    /** Ordered canonical inputs; join before applying formats and hashing. */
+    sources?: string[];
+    separator?: string | null;
     level?: FieldMapLevel;
     type?: FieldValueType;
     /** Ordered formatting pipeline. Each output becomes the next format's input. */
@@ -174,6 +177,8 @@ export type FieldMapValue = string | FieldMapEntry;
 
 export interface NormalizedFieldMapEntry {
     to: string;
+    sources?: string[];
+    separator?: string;
     level: FieldMapLevel;
     type: FieldValueType | null;
     formats: string[];
@@ -217,6 +222,10 @@ export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | 
     const to = raw.to;
     if (typeof to !== 'string' || !isValidOutputPath(to)) return null;
 
+    if ('sources' in raw && !isValidFieldSources(raw.sources)) return null;
+    if (raw.separator != null && typeof raw.separator !== 'string') return null;
+    if ('separator' in raw && !('sources' in raw)) return null;
+
     const level: FieldMapLevel = raw.level === 0 || raw.level === '0' ? FIELD_MAP_LEVEL_ROOT : FIELD_MAP_LEVEL_NESTED;
     const type = isFieldValueType(raw.type) ? raw.type : null;
     const legacyHash = raw.format === 'hashed';
@@ -235,7 +244,15 @@ export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | 
         type: formats.length > 0 || legacyHash ? type : null,
         formats,
         hash: raw.hash === true || legacyHash,
+        ...(Array.isArray(raw.sources) ? { sources: [...raw.sources] as string[], separator: (raw.separator ?? '') as string } : {}),
     };
+}
+
+/** Shared by the importer and runtime; malformed derived entries never fall back to a different source. */
+export function isValidFieldSources(value: unknown): value is string[] {
+    return Array.isArray(value) && value.length > 0 && value.length <= 20
+        && value.every((source) => typeof source === 'string' && [...source].length <= 100 && isValidOutputPath(source))
+        && new Set(value).size === value.length;
 }
 
 /**
@@ -257,10 +274,14 @@ export function normalizeFieldMap(fieldMap: Record<string, unknown> | undefined 
  * legacy string when it is a plain rename, the object otherwise.
  */
 export function serializeFieldMapEntry(entry: NormalizedFieldMapEntry): FieldMapValue {
-    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.formats.length === 0 && !entry.hash) {
+    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.formats.length === 0 && !entry.hash && !entry.sources) {
         return entry.to;
     }
     const out: FieldMapEntry = { to: entry.to };
+    if (entry.sources) {
+        out.sources = [...entry.sources];
+        out.separator = entry.separator ?? '';
+    }
     if (entry.level === FIELD_MAP_LEVEL_ROOT) out.level = FIELD_MAP_LEVEL_ROOT;
     if (entry.type !== null && entry.formats.length > 0) {
         out.type = entry.type;

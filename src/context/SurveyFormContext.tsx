@@ -10,7 +10,7 @@ import type {
   BranchingLogic
 } from "../types";
 import { getSurveyPages, getSurveyPageIds, evaluateLogic, detectSurveyMode } from "../utils/surveyUtils";
-import type { SurveyMode } from "../types";
+import type { BlockOverrides, SurveyMode } from "../types";
 import { validationRuleToFunction } from "../builder/common/validation-rules-types";
 import {
   evaluateCondition,
@@ -21,7 +21,7 @@ import {
   getNextStepFromNavigationRules
 } from "../utils/conditionalUtils";
 import { ThemeDefinition, themes } from "../themes";
-import { getBlockDefinition } from "../blocks";
+import { resolveBlockDefinition } from "../blocks";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
 // Navigation history entry - uses UUIDs for stable references across conditional navigation
@@ -110,6 +110,8 @@ interface SurveyFormProviderProps {
   abTestPreviewMode?: boolean; // If true, bypasses storage and selects fresh variants each time
   analytics?: any; // Analytics configuration passed from SurveyForm
   customData?: any; // Custom data for custom blocks
+  /** System block type to the registered block type that renders in its place. */
+  blockOverrides?: BlockOverrides;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -141,6 +143,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   abTestPreviewMode = false,
   analytics,
   customData,
+  blockOverrides,
   mode,
 }) => {
   // Debug log for resume functionality
@@ -715,7 +718,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       : allBlocks.find(block => block.fieldName === fieldName);
     
     if (block) {
-      const blockDefinition = getBlockDefinition(block.type);
+      const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
       if (blockDefinition?.validateValue) {
         try {
           const blockValidationError = blockDefinition.validateValue(value, block);
@@ -768,7 +771,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     }
 
     return null;
-  }, [customValidators, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext]);
+  }, [customValidators, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext, blockOverrides]);
 
   // Calculate if the current page is valid
   const currentPageBlocks = pages[currentPage] || [];
@@ -1062,7 +1065,8 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         logo,
         abTestPreviewMode,
         analytics,
-        customData
+        customData,
+        blockOverrides
       }}
     >
       {children}

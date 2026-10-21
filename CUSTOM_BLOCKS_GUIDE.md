@@ -264,6 +264,29 @@ import { blockRegistry } from "survey-form-package/src";
 blockRegistry['my-custom-type'] = MyCustomBlock;
 ```
 
+## Overriding a System Block
+
+A registered block can stand in for a built-in one. Map the built-in type to your block's type with `blockOverrides`, and pass the same mapping to `SurveyForm` and `SurveyBuilder`:
+
+```tsx
+import { SurveyForm, registerBlock } from "survey-form-package/src";
+import type { BlockOverrides } from "survey-form-package/src";
+
+registerBlock(MyYesNoBlock); // type: "myYesNo"
+
+const blockOverrides: BlockOverrides = { yesNoAnswer: "myYesNo" };
+
+<SurveyForm survey={surveyData} blockOverrides={blockOverrides} />
+```
+
+What your block needs to know:
+
+- It receives blocks whose `type` is the built-in type (`yesNoAnswer`), and the builder saves new blocks with that type, so forms stay valid without the mapping.
+- It should save the same answer shape as the block it replaces, because rules and computed fields read that answer.
+- If it isn't registered, has no `renderBlock`, or throws while rendering, the built-in block is shown instead, with its own validation. After a throw, every block of that type uses the built-in block until the page reloads or your block is registered again. The library logs one console message per mapping; React also reports the error it caught.
+- Have `renderBlock` return a component rather than call hooks itself, so the block can be swapped while a form is open.
+- Chat and voice layouts show display-only blocks as chat text, whatever the mapping.
+
 ## Block Definition Properties
 
 ### Required Properties

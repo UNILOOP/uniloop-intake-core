@@ -140,6 +140,7 @@ export {
   expandSavedValues,
   findBlockForField,
   getFieldQuestion,
+  resolveFieldQuestion,
   getDefaultFieldQuestion,
   getFieldValidationRules,
   getBlockFieldErrors,

@@ -1,5 +1,6 @@
-import type { BlockData, BlockDefinition, ValidationRule } from '../types';
+import type { BlockData, BlockDefinition, NodeData, ValidationRule } from '../types';
 import { getObjectOutputSchema } from './outputSchema';
+import { getSurveyPages } from './surveyUtils';
 
 /**
  * Utility functions for blocks that save output keys under their own field names
@@ -116,6 +117,27 @@ export function getFieldQuestion(
   const mapped = getMappedFields(block).find((field) => field.fieldName === name);
   if (!mapped) return block.label || block.name || '';
   return mapped.question || getDefaultFieldQuestion(block, mapped.key, blockDefinition);
+}
+
+/**
+ * Get the question a field name answers anywhere in a form, from the field name alone.
+ * Takes the form's data (`{ rootNode }`), its root node, or its blocks. Pass the block
+ * definitions (custom ones included) so a mapped key without its own question can use
+ * its output property's description.
+ * @returns The question, or undefined when no block in the form saves the name
+ */
+export function resolveFieldQuestion(
+  form: { rootNode: NodeData } | NodeData | BlockData[] | null | undefined,
+  fieldName: string,
+  blockDefinitions?: Record<string, BlockDefinition>
+): string | undefined {
+  if (!form) return undefined;
+  const blocks = Array.isArray(form)
+    ? form
+    : getSurveyPages('rootNode' in form && form.rootNode ? form.rootNode : (form as NodeData)).flat();
+  const match = findBlockForField(blocks, fieldName);
+  if (!match) return undefined;
+  return getFieldQuestion(match.block, fieldName, blockDefinitions?.[match.block.type]);
 }
 
 /**

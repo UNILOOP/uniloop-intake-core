@@ -479,7 +479,16 @@ renderBlock: ({ value, onChange, error, fieldErrors }) => (
 
 The helpers behind this are exported for hosts: `getBlockFieldNames(block)` lists every field a
 block saves, `findBlockForField(blocks, name)` finds the block and output key for a name, and
-`getFieldQuestion(block, name, definition)` gives the question a field answers. Saved or prefilled
+`getFieldQuestion(block, name, definition)` gives the question a field answers. With only a field
+name, `resolveFieldQuestion(form, name, definitions)` finds the block in the form (`{ rootNode }`, the
+root node, or its blocks) and gives the same question, or `undefined` when no block saves the name:
+
+```ts
+resolveFieldQuestion(surveyData, 'headacheSeverity', { headacheCheck: HeadacheCheckBlock });
+// "How bad are your headaches usually?"
+```
+
+Saved or prefilled
 answers (`defaultValues`, `initialValues`) fill in their mapped keys when the form loads. The page-by-page
 and stepper layouts pass `fieldErrors`; the chat and voice layouts don't yet.
 

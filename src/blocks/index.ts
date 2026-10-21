@@ -203,9 +203,9 @@ function withOverrideFallback<P>(
         key: overrideType,
         systemType,
         overrideType,
-        fallback: fallback ? React.createElement(RenderWith, { render: fallback, props }) : null,
+        fallback: fallback ? React.createElement(RenderWith<P>, { render: fallback, props }) : null,
       },
-      React.createElement(RenderWith, { render, props })
+      React.createElement(RenderWith<P>, { render, props })
     );
 }
 
@@ -222,8 +222,8 @@ export function findBlockOverride(
   blocks?: Record<string, BlockDefinition>
 ): BlockDefinition | undefined {
   let override: BlockDefinition | undefined;
-  if (blocks && Object.hasOwn(blocks, overrideType)) override = blocks[overrideType];
-  else if (Object.hasOwn(blockRegistry, overrideType)) override = getBlockDefinition(overrideType);
+  if (blocks && Object.prototype.hasOwnProperty.call(blocks, overrideType)) override = blocks[overrideType];
+  else if (Object.prototype.hasOwnProperty.call(blockRegistry, overrideType)) override = getBlockDefinition(overrideType);
 
   let problem: string | undefined;
   if (!override) problem = "isn't registered";

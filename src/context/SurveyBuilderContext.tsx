@@ -35,13 +35,13 @@ export const useSurveyBuilder = () => {
  * itself when nothing is replaced.
  */
 function applyBlockOverrides(
-  blocks: Record<string, BlockDefinition> | undefined,
+  blocks: Record<string, BlockDefinition>,
   overrides: BlockOverrides | undefined
-): Record<string, BlockDefinition> | undefined {
-  if (!overrides || !blocks) return blocks;
+): Record<string, BlockDefinition> {
+  if (!overrides) return blocks;
   let effectiveBlocks: Record<string, BlockDefinition> | null = null;
   for (const [systemType, overrideType] of Object.entries(overrides)) {
-    const system = Object.hasOwn(blocks, systemType) ? blocks[systemType] : undefined;
+    const system = Object.prototype.hasOwnProperty.call(blocks, systemType) ? blocks[systemType] : undefined;
     if (!system || typeof overrideType !== "string" || overrideType === systemType) continue;
     const override = findBlockOverride(systemType, overrideType, system, blocks);
     if (!override) continue;
@@ -458,7 +458,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   // Builder surfaces read block definitions from the context state, so each
   // override shows wherever the system block it replaces would. The blocks
   // record only changes when the definitions or the mapping do.
-  const stateBlocks = state.definitions?.blocks;
+  const stateBlocks = state.definitions.blocks;
   const effectiveBlocks = useMemo(
     () => applyBlockOverrides(stateBlocks, blockOverrides),
     [stateBlocks, blockOverrides]

@@ -11,6 +11,7 @@ import { NavigationRulesEditor } from "../common/NavigationRulesEditor";
 import { ValidationRulesEditor } from "../common/ValidationRulesEditor";
 import { CommonBlockRules } from "../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../common/FieldNameField";
+import { OutputFieldsEditor } from "../common/OutputFieldsEditor";
 import { ABTestEditor } from "../common/ABTestEditor";
 
 interface NodeConfigPanelProps {
@@ -182,6 +183,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
           )}
         </div>
 
+        <OutputFieldsEditor data={blockData} onUpdate={handleBlockUpdate} />
 
         {/* Common Block Rules */}
         <CommonBlockRules 

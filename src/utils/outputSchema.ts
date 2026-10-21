@@ -86,7 +86,7 @@ export function resolveUnionSchema(
  * Get the object schema a block outputs, resolving union types
  * @returns The object schema, or undefined when the block doesn't output an object
  */
-function getObjectOutputSchema(
+export function getObjectOutputSchema(
   blockDefinition: BlockDefinition,
   blockData?: BlockData
 ): OutputSchemaObject | undefined {

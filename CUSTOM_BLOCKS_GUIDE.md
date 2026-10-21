@@ -328,6 +328,7 @@ interface BlockRendererProps {
   onChange?: (value: any) => void;  // Value change handler
   onBlur?: () => void;       // Blur event handler
   error?: string;            // Validation error message
+  fieldErrors?: Record<string, string>; // Errors of mapped output keys, by output key
   disabled?: boolean;        // Whether the field is disabled
   theme?: ThemeDefinition;   // Current theme
   isVisible?: boolean;       // Visibility state
@@ -433,6 +434,54 @@ renderBlock: ({ block, value, onChange }) => {
   );
 }
 ```
+
+### Saving Output Keys Under Their Own Field Names
+
+A block whose answer is an object can save each key under its own field name, so navigation
+rules, validation rules and the flow builder use that key like any other field. The block's
+own answer stays under its `fieldName` as before.
+
+1. Declare the keys in the block's `outputSchema` (an object type). A key's `description` is
+   the default question it answers, and its `options` fill rule value pickers.
+2. In the builder, the block's settings show **Output Field Names**: one row per key, with a
+   field name and a question. A key with no field name stays inside the block's answer only.
+   The builder warns when a name is already used elsewhere in the form. The block needs its own
+   field name: without one its answer isn't saved, so neither are its keys.
+3. The settings are saved on the block as `outputFields`:
+
+```json
+{
+  "type": "symptomCheck",
+  "fieldName": "symptoms",
+  "outputFields": {
+    "frequency": { "fieldName": "symptomFrequency", "question": "How often do you have symptoms?" },
+    "severity": { "fieldName": "symptomSeverity" }
+  }
+}
+```
+
+When the block calls `onChange`, the form saves `symptoms` and every mapped key in one update,
+before validation and navigation run, auto-continue included. A validation rule whose field is a
+mapped key reports under that key, and the block receives those errors in `fieldErrors`, keyed by
+output key, next to its own `error`:
+
+```typescript
+renderBlock: ({ value, onChange, error, fieldErrors }) => (
+  <div>
+    <select value={value?.frequency ?? ''} onChange={(e) => onChange?.({ ...value, frequency: e.target.value })}>
+      ...
+    </select>
+    {fieldErrors?.frequency && <p role="alert">{fieldErrors.frequency}</p>}
+    {error && <p role="alert">{error}</p>}
+  </div>
+)
+```
+
+The helpers behind this are exported for hosts: `getBlockFieldNames(block)` lists every field a
+block saves, `findBlockForField(blocks, name)` finds the block and output key for a name, and
+`getFieldQuestion(block, name, definition)` gives the question a field answers. Saved or prefilled
+answers (`defaultValues`, `initialValues`) fill in their mapped keys when the form loads. The page-by-page
+and stepper layouts pass `fieldErrors`; the chat and voice layouts don't yet.
 
 ## Troubleshooting
 

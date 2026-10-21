@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useSurveyForm } from '../../../context/SurveyFormContext';
 import { BlockRenderer } from '../../renderers/BlockRenderer';
+import { getBlockFieldErrors } from '../../../utils/blockFields';
 import { getSurveyPages, detectSurveyMode } from '../../../utils/surveyUtils';
 
 interface CurrentBlockProps {
@@ -96,6 +97,7 @@ export const CurrentBlock: React.FC<CurrentBlockProps> = ({
       value={currentBlock.fieldName ? values[currentBlock.fieldName] : undefined}
       onChange={handleChange}
       error={currentBlock.fieldName ? errors[currentBlock.fieldName] : undefined}
+      fieldErrors={getBlockFieldErrors(currentBlock, errors)}
       ref={firstInputRef}
       theme={theme}
     />

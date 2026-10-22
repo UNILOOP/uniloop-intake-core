@@ -133,6 +133,19 @@ export {
 // Field name helpers (value-block field name support)
 export { generateFieldName, sanitizeFieldName } from './blocks/utils/GenFieldName';
 export { FieldNameField, useFieldName, resolveFieldConfig } from './builder/common/FieldNameField';
+export {
+  getMappedFields,
+  getBlockFieldNames,
+  expandBlockValue,
+  expandSavedValues,
+  findBlockForField,
+  getFieldQuestion,
+  resolveFieldQuestion,
+  getDefaultFieldQuestion,
+  getFieldValidationRules,
+  getBlockFieldErrors,
+} from './utils/blockFields';
+export type { MappedField, BlockFieldMatch } from './utils/blockFields';
 
 // --------------------------------------------------------------------------
 // Types - Export specific types needed for rendering (not export *)
@@ -156,6 +169,7 @@ export type {
   OutputSchemaArray,
   OutputSchemaObject,
   OutputSchemaOption,
+  OutputFieldMapping,
   OutputSchemaUnion,
 
   // Node types

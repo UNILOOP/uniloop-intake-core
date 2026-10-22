@@ -2,6 +2,7 @@ import type React from "react";
 import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react"
 import { v4 as uuidv4 } from "uuid";
 import {
+  type BlockData,
   type BlockDefinition,
   type BlockOverrides,
   type GlobalCustomField,
@@ -17,6 +18,7 @@ import {
 import { uniloop as uniTheme } from "../themes";
 import { findBlockOverride, pinBlockOverride } from "../blocks";
 import { getRuleOutputKeys, isObjectOutput } from "../utils/outputSchema";
+import { getMappedFields } from "../utils/blockFields";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 
 // Custom hook
@@ -655,6 +657,26 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     return null;
   };
 
+  // Helper: The field names a block saves: its own, its object output's keys as
+  // `fieldName.<key>` (e.g. "authResults.email"), and the keys it saves under their own names
+  const getNodeFieldNames = (node: BlockData): string[] => {
+    const names: string[] = [];
+    if (node.fieldName) {
+      names.push(node.fieldName);
+
+      const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
+      if (blockDefinition && isObjectOutput(blockDefinition, node)) {
+        for (const key of getRuleOutputKeys(blockDefinition, node)) {
+          names.push(`${node.fieldName}.${key}`);
+        }
+      }
+    }
+    for (const { fieldName } of getMappedFields(node)) {
+      names.push(fieldName);
+    }
+    return names;
+  };
+
   // Helper: Collect field names from blocks, including nested fields from output schemas
   const collectFieldsFromBlocks = (
     blocks: any[],
@@ -676,22 +698,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         continue;
       }
 
-      if (item.fieldName) {
-        names.push(item.fieldName);
-
-        // Check if this block has an output schema with nested fields
-        const blockDefinition = effectiveState.definitions?.blocks?.[item.type];
-        if (blockDefinition && item.fieldName) {
-          // Check if block outputs an object (which may have nested fields)
-          if (isObjectOutput(blockDefinition, item)) {
-            const outputKeys = getRuleOutputKeys(blockDefinition, item);
-            // Add nested field accessors (e.g., "authResults.email")
-            for (const key of outputKeys) {
-              names.push(`${item.fieldName}.${key}`);
-            }
-          }
-        }
-      }
+      names.push(...getNodeFieldNames(item));
 
       // Recurse into subitems if they exist
       if (Array.isArray(item.items)) {
@@ -755,21 +762,8 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         return;  // Don't include the current block
       }
 
-      // Add this node's field name if it exists
-      if (node.fieldName) {
-        fieldNames.push(node.fieldName);
-
-        // Add nested fields from output schema
-        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
-        if (blockDefinition) {
-          if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getRuleOutputKeys(blockDefinition, node);
-            for (const key of outputKeys) {
-              fieldNames.push(`${node.fieldName}.${key}`);
-            }
-          }
-        }
-      }
+      // Add this node's field names if it has any
+      fieldNames.push(...getNodeFieldNames(node));
 
       // Recursively traverse child items
       if (Array.isArray(node.items)) {
@@ -813,21 +807,8 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         found = true;
       }
 
-      // Add this node's field name if it exists
-      if (node.fieldName) {
-        fieldNames.push(node.fieldName);
-
-        // Add nested fields from output schema
-        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
-        if (blockDefinition) {
-          if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getRuleOutputKeys(blockDefinition, node);
-            for (const key of outputKeys) {
-              fieldNames.push(`${node.fieldName}.${key}`);
-            }
-          }
-        }
-      }
+      // Add this node's field names if it has any
+      fieldNames.push(...getNodeFieldNames(node));
 
       // Recursively traverse child items
       if (Array.isArray(node.items)) {
@@ -867,21 +848,8 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         return;
       }
 
-      // Add this node's field name if it exists
-      if (node.fieldName) {
-        fieldNames.push(node.fieldName);
-
-        // Add nested fields from output schema
-        const blockDefinition = effectiveState.definitions?.blocks?.[node.type];
-        if (blockDefinition) {
-          if (isObjectOutput(blockDefinition, node)) {
-            const outputKeys = getRuleOutputKeys(blockDefinition, node);
-            for (const key of outputKeys) {
-              fieldNames.push(`${node.fieldName}.${key}`);
-            }
-          }
-        }
-      }
+      // Add this node's field names if it has any
+      fieldNames.push(...getNodeFieldNames(node));
 
       // Recursively traverse child items
       if (Array.isArray(node.items)) {

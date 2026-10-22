@@ -9,6 +9,7 @@ import { BlockData } from "../../../types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 import {CommonBlockRules} from "../../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
+import { OutputFieldsEditor } from "../../common/OutputFieldsEditor";
 import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
 import { PieChart } from "lucide-react";
 
@@ -106,6 +107,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                     },
                   })}
                 </div>
+                <OutputFieldsEditor data={data} onUpdate={onUpdate} />
                 <CommonBlockRules data={data} onUpdate={onUpdate} />
                 <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
                   <ABTestEditor data={data} onUpdate={onUpdate} />

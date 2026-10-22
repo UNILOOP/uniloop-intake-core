@@ -15,6 +15,7 @@ import { useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import type { BlockData, NavigationRule } from "../../types";
 import { NavigationRuleValueInput } from "./NavigationRuleValueInput";
 import { getOutputPropertyOptions } from "../../utils/outputSchema";
+import { getMappedFields } from "../../utils/blockFields";
 import {
   OPERATORS,
   enhancedRuleToStandard,
@@ -106,6 +107,25 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
     return traverse(state.rootNode);
   }, [state.rootNode]);
 
+  // Helper function to find the block that saves an output key under this field name
+  const findMappedField = React.useCallback((fieldName: string): { block: BlockData; key: string } | null => {
+    if (!state.rootNode || !fieldName) return null;
+
+    const traverse = (node: BlockData): { block: BlockData; key: string } | null => {
+      const mapped = getMappedFields(node).find((field) => field.fieldName === fieldName);
+      if (mapped) return { block: node, key: mapped.key };
+
+      for (const child of [...(node.items || []), ...(node.nodes || [])]) {
+        if (typeof child === "string") continue;
+        const result = traverse(child);
+        if (result) return result;
+      }
+      return null;
+    };
+
+    return traverse(state.rootNode as BlockData);
+  }, [state.rootNode]);
+
   // Helper function to extract options from a block
   const getBlockOptions = React.useCallback((block: BlockData | null): Array<{ label: string; value: string }> => {
     if (!block) return [];
@@ -135,6 +155,13 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
     const block = findBlockByFieldName(field);
     if (block) return getBlockOptions(block);
 
+    // A key a block saves under its own field name lists its output schema's options
+    const mapped = findMappedField(field);
+    if (mapped) {
+      const definition = state.definitions?.blocks?.[mapped.block.type];
+      return definition ? getOutputPropertyOptions(definition, mapped.block, mapped.key) : [];
+    }
+
     const dot = field.indexOf(".");
     if (dot === -1) return [];
 
@@ -143,7 +170,7 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
     if (!parent || !definition) return [];
 
     return getOutputPropertyOptions(definition, parent, field.slice(dot + 1));
-  }, [findBlockByFieldName, getBlockOptions, state.definitions?.blocks]);
+  }, [findBlockByFieldName, findMappedField, getBlockOptions, state.definitions?.blocks]);
 
   const findBlockPath = React.useCallback((node: any, targetUuid: string, currentPath: any[] = []): any[] | null => {
     if (!node) return null;

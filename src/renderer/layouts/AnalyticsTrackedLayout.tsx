@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useSurveyForm } from '../../context/SurveyFormContext';
 import { useSurveyAnalytics } from '../../analytics';
+import { getBlockFieldNames } from '../../utils/blockFields';
+import type { BlockData } from '../../types';
 
 interface AnalyticsTrackedLayoutProps {
   children: React.ReactNode;
@@ -184,16 +186,22 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
         let fieldData: any = null;
         let pageIndex = -1;
 
-        for (let i = 0; i < pages.length; i++) {
-          for (const block of (pages[i].items || [])) {
-            if (block.uuid === fieldId || block.fieldName === fieldId) {
+        // A block's own field wins over another block's mapped key with the same name
+        const isOwnField = (block: BlockData) => block.uuid === fieldId || block.fieldName === fieldId;
+        const isMappedField = (block: BlockData) => getBlockFieldNames(block).includes(fieldId);
+        for (const matches of [isOwnField, isMappedField]) {
+          for (let i = 0; i < pages.length && !fieldData; i++) {
+            const block = (pages[i].items || []).find(matches);
+            if (block) {
               fieldData = block;
               pageIndex = i;
-              break;
             }
           }
           if (fieldData) break;
         }
+
+        // A mapped output key changes with its block's answer, which is tracked once
+        const isMappedKey = fieldData && fieldData.uuid !== fieldId && fieldData.fieldName !== fieldId;
 
         if (fieldData) {
           const blockLabel = fieldData.label || `Block ${fieldId}`;
@@ -208,20 +216,22 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
             );
           }
 
-          // Always track block value selection event (independent of trackFieldInteractions)
-          trackCustomEvent(
-            'block_value_selected',
-            blockLabel,
-            undefined,
-            {
-              surveyName,
+          // Track the block value selection once per answer (independent of trackFieldInteractions)
+          if (!isMappedKey) {
+            trackCustomEvent(
+              'block_value_selected',
               blockLabel,
-              blockType: fieldData.type,
-              blockValue: newValue,
-              pageIndex,
-              timestamp: new Date().toISOString()
-            }
-          );
+              undefined,
+              {
+                surveyName,
+                blockLabel,
+                blockType: fieldData.type,
+                blockValue: newValue,
+                pageIndex,
+                timestamp: new Date().toISOString()
+              }
+            );
+          }
         }
       }
     });
@@ -245,7 +255,7 @@ export const AnalyticsTrackedLayout: React.FC<AnalyticsTrackedLayoutProps> = ({
 
         for (const page of pages) {
           for (const block of (page.items || [])) {
-            if (block.uuid === fieldId || block.fieldName === fieldId) {
+            if (block.uuid === fieldId || getBlockFieldNames(block).includes(fieldId)) {
               fieldData = block;
               break;
             }

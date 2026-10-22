@@ -247,7 +247,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
               source: blockId,
               target: targetId,
               // Use human readable label
-              label: rule.isDefault ? "Default" : getHumanReadableCondition(rule.condition, blocks),
+              label: rule.isDefault ? "Default" : getHumanReadableCondition(rule.condition, blocks, state.definitions.blocks),
               // ALWAYS use button-edge to show labels/delete buttons
               type: "button-edge",
               animated: !rule.isDefault,

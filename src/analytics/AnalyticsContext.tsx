@@ -56,11 +56,11 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     return () => window.removeEventListener('uniloop:consent', refreshConsent);
   }, []);
 
-  const fullData = (channel: string): boolean => config.eventMappings?.full_data_channels?.includes(channel) === true;
-  const providerFullData = (provider: AnalyticsProvider): boolean => {
+  const fullData = useCallback((channel: string): boolean => config.eventMappings?.full_data_channels?.includes(channel) === true, [config.eventMappings]);
+  const providerFullData = useCallback((provider: AnalyticsProvider): boolean => {
     const channel = ({ GoogleAnalytics: 'google_analytics', GoogleAds: 'google_ads', GoogleTagManager: 'google_tag_manager', MetaPixel: 'meta' } as Record<string, string>)[provider.name];
     return channel ? fullData(channel) : provider.name === 'CustomPixel' && (config.customPixels?.pixels.some(pixel => fullData(pixel.key)) ?? false);
-  };
+  }, [config.customPixels, fullData]);
 
   // Initialize analytics providers
   useEffect(() => {
@@ -200,7 +200,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
       });
     };
-  }, [config, enabled, debug, consentPermissions.marketing]);
+  }, [config, enabled, debug, consentPermissions.marketing, fullData]);
 
   const eventAllowed = useCallback((action: string): boolean => {
     const channels = config.eventMappings?.events?.[action] ?? {};
@@ -237,7 +237,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track event:`, error);
       }
     });
-  }, [providers, enabled, debug, config, eventAllowed]);
+  }, [providers, enabled, debug, config, eventAllowed, providerFullData]);
 
   // Track page view across all providers
   const trackPageView = useCallback((url: string, title?: string, additionalData?: Record<string, any>) => {
@@ -266,7 +266,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track page view:`, error);
       }
     });
-  }, [providers, enabled, debug, config, eventAllowed]);
+  }, [providers, enabled, debug, config, eventAllowed, providerFullData]);
 
   // Track timing across all providers
   const trackTiming = useCallback((category: string, variable: string, value: number, label?: string) => {
@@ -295,7 +295,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to track timing:`, error);
       }
     });
-  }, [providers, enabled, debug, config, eventAllowed]);
+  }, [providers, enabled, debug, config, eventAllowed, providerFullData]);
 
   // Set user properties across all providers
   const setUserProperties = useCallback((properties: Record<string, any>) => {
@@ -324,7 +324,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         console.error(`[Analytics:${provider.name}] Failed to set user properties:`, error);
       }
     });
-  }, [providers, enabled, debug, config, eventAllowed]);
+  }, [providers, enabled, debug, config, eventAllowed, providerFullData]);
 
   const value: AnalyticsContextValue = {
     providers,

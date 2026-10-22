@@ -104,7 +104,7 @@ export class GoogleAdsProvider implements AnalyticsProvider {
         ) return;
         const browser = window as unknown as { UNILOOP_PIXEL_REQUIRED?: boolean; UNILOOP_PIXEL_STATE?: { ready?: boolean; requires_consent?: boolean; consent?: Record<string, boolean> } };
         const category = mapping?.consent_category ?? 'marketing';
-        if (browser.UNILOOP_PIXEL_REQUIRED && category !== 'necessary'
+        if (!this.eventMappings?.full_data_channels?.includes('google_ads') && browser.UNILOOP_PIXEL_REQUIRED && category !== 'necessary'
             && !(browser.UNILOOP_PIXEL_STATE?.ready && !browser.UNILOOP_PIXEL_STATE.requires_consent && browser.UNILOOP_PIXEL_STATE.consent?.[category])) return;
 
         const canonicalPayload: Record<string, unknown> = {
@@ -125,7 +125,7 @@ export class GoogleAdsProvider implements AnalyticsProvider {
             this.eventMappings?.global_drop_keys?.google_ads ?? [],
             this.eventMappings?.global_hash_keys?.google_ads ?? [],
             [],
-            mapping?.hipaa_filter ?? this.hipaaFilter,
+            this.eventMappings?.full_data_channels?.includes('google_ads') ? false : (mapping?.hipaa_filter ?? this.hipaaFilter),
         );
         payload.send_to = `${conversionId}/${conversionLabel}`;
         window.gtag?.('event', 'conversion', payload);

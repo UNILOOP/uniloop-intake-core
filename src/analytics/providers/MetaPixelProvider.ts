@@ -193,7 +193,7 @@ export class MetaPixelProvider implements AnalyticsProvider {
             this.eventMappings?.global_drop_keys?.meta ?? [],
             this.eventMappings?.global_hash_keys?.meta ?? [],
             [],
-            mapping?.hipaa_filter ?? this.hipaaFilter,
+            this.eventMappings?.full_data_channels?.includes('meta') ? false : (mapping?.hipaa_filter ?? this.hipaaFilter),
         );
 
         return { eventName, customData };

@@ -8,6 +8,8 @@ import type { ExtraFieldValue, FieldMapValue } from './fieldFormats';
  * package does not need to depend on the host app's schema module.
  */
 export interface AnalyticsEventMappings {
+    full_data_channels?: string[];
+    independent_server_events?: string[];
     collection_consent?: Record<string, Array<'necessary' | 'preferences' | 'analytics' | 'marketing'>>;
     version?: number;
     global_drop_keys?: Record<string, string[]>;

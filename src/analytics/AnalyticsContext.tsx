@@ -56,9 +56,15 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     return () => window.removeEventListener('uniloop:consent', refreshConsent);
   }, []);
 
+  const fullData = (channel: string): boolean => config.eventMappings?.full_data_channels?.includes(channel) === true;
+  const providerFullData = (provider: AnalyticsProvider): boolean => {
+    const channel = ({ GoogleAnalytics: 'google_analytics', GoogleAds: 'google_ads', GoogleTagManager: 'google_tag_manager', MetaPixel: 'meta' } as Record<string, string>)[provider.name];
+    return channel ? fullData(channel) : provider.name === 'CustomPixel' && (config.customPixels?.pixels.some(pixel => fullData(pixel.key)) ?? false);
+  };
+
   // Initialize analytics providers
   useEffect(() => {
-    if (!enabled || !consentPermissions.marketing) {
+    if (!enabled || (!consentPermissions.marketing && !(config.eventMappings?.full_data_channels?.length))) {
       if (debug) {
         console.log('[Analytics] Analytics disabled');
       }
@@ -82,7 +88,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
       try {
         // Initialize Google Analytics
-        if (config.googleAnalytics?.measurementId) {
+        if (config.googleAnalytics?.measurementId && (consentPermissions.marketing || fullData('google_analytics'))) {
           if (debug) {
             console.log('[Analytics] Initializing Google Analytics with measurement ID:', config.googleAnalytics.measurementId);
           }
@@ -101,7 +107,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize Google Ads
-        if (config.googleAds) {
+        if (config.googleAds && (consentPermissions.marketing || fullData('google_ads'))) {
           const googleAdsProvider = new GoogleAdsProvider();
           await googleAdsProvider.initialize({
             ...config.googleAds,
@@ -112,7 +118,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize Google Tag Manager
-        if (config.googleTagManager?.containerId) {
+        if (config.googleTagManager?.containerId && (consentPermissions.marketing || fullData('google_tag_manager'))) {
           const gtmProvider = new GoogleTagManagerProvider();
           await gtmProvider.initialize({
             ...config.googleTagManager,
@@ -128,7 +134,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize Meta Pixel
-        if (config.meta?.pixelId) {
+        if (config.meta?.pixelId && (consentPermissions.marketing || fullData('meta'))) {
           if (debug) {
             console.log('[Analytics] Initializing Meta Pixel with pixel ID:', config.meta.pixelId);
           }
@@ -147,13 +153,14 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize custom browser pixels (TikTok, Snapchat, …)
-        if (config.customPixels?.pixels && config.customPixels.pixels.length > 0) {
+        if (config.customPixels?.pixels && config.customPixels.pixels.some(pixel => consentPermissions.marketing || fullData(pixel.key))) {
           if (debug) {
             console.log('[Analytics] Initializing Custom Pixels:', config.customPixels.pixels);
           }
           const customPixelProvider = new CustomPixelProvider();
           await customPixelProvider.initialize({
             ...config.customPixels,
+            pixels: config.customPixels.pixels.filter(pixel => consentPermissions.marketing || fullData(pixel.key)),
             eventMappings: config.customPixels.eventMappings ?? config.eventMappings,
             debug: debug || config.customPixels.debug,
             sessionId: config.sessionId,
@@ -166,7 +173,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
         }
 
         // Initialize custom provider if provided
-        if (config.custom?.handler) {
+        if (consentPermissions.marketing && config.custom?.handler) {
           await config.custom.handler.initialize(config.custom.config);
           activeProviders.push(config.custom.handler);
           if (debug) {
@@ -197,6 +204,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   const eventAllowed = useCallback((action: string): boolean => {
     const channels = config.eventMappings?.events?.[action] ?? {};
+    if (config.eventMappings?.independent_server_events?.includes(action)) return true;
     if (consentPermissions.analytics && consentAllows('analytics')) return true;
     return (config.eventMappings?.collection_consent?.[action] ?? []).some(category => consentPermissions[category] && consentAllows(category))
       || Object.values(channels).some(mapping => mapping.enabled !== false && mapping.consent_category != null && consentPermissions[mapping.consent_category] && consentAllows(mapping.consent_category));
@@ -218,10 +226,10 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
+      if (!providerFullData(provider) && (!consentAllows('analytics') || !consentAllows('marketing'))) return;
       try {
-        provider.trackEvent(pixelSafeEvent(event, provider !== config.custom?.handler));
+        provider.trackEvent(providerFullData(provider) ? event : pixelSafeEvent(event, provider !== config.custom?.handler));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Event tracked:`, event);
         }
@@ -247,10 +255,10 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
+      if (!providerFullData(provider) && (!consentAllows('analytics') || !consentAllows('marketing'))) return;
       try {
-        provider.trackPageView(pixelEventProtectionActive() ? pixelSafeUrl(url) : url, pixelEventProtectionActive() ? undefined : title, pixelSafeMetadata(additionalData));
+        provider.trackPageView(providerFullData(provider) ? url : (pixelEventProtectionActive() ? pixelSafeUrl(url) : url), providerFullData(provider) ? title : (pixelEventProtectionActive() ? undefined : title), providerFullData(provider) ? additionalData : pixelSafeMetadata(additionalData));
         if (debug) {
           console.log(`[Analytics:${provider.name}] Page view tracked:`, { url, title, additionalData });
         }
@@ -276,8 +284,8 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('analytics') || !consentAllows('marketing')) return;
     providers.forEach(provider => {
+      if (!providerFullData(provider) && (!consentAllows('analytics') || !consentAllows('marketing'))) return;
       try {
         provider.trackTiming(category, variable, value, label);
         if (debug) {
@@ -305,8 +313,8 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
       }
     }
 
-    if (!consentAllows('analytics') || !consentAllows('marketing') || pixelEventProtectionActive()) return;
     providers.forEach(provider => {
+      if (!providerFullData(provider) && (!consentAllows('analytics') || !consentAllows('marketing') || pixelEventProtectionActive())) return;
       try {
         provider.setUserProperties(properties);
         if (debug) {
@@ -326,7 +334,8 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     setUserProperties,
     isEnabled: enabled && (consentAllows('analytics')
       || Object.keys(config.eventMappings?.events ?? {}).some(eventAllowed)
-      || Object.keys(config.eventMappings?.collection_consent ?? {}).some(eventAllowed))
+      || Object.keys(config.eventMappings?.collection_consent ?? {}).some(eventAllowed)
+      || (config.eventMappings?.independent_server_events?.length ?? 0) > 0)
       && (isInitialized || Boolean(config.trackEvent || config.trackPageView)),
     config
   };

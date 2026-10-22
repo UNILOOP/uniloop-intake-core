@@ -17,7 +17,8 @@ type ResolvedOutputSchema = OutputSchemaScalar | OutputSchemaArray | OutputSchem
 /**
  * Fields a replacement keeps from the block it replaces. They tie the block into
  * its form: its id, where its answer is stored, and the rules and links that read
- * or follow it.
+ * or follow it. The lock flag stays with the block too; a locked block can't be
+ * replaced, so it's only ever `false` here, from a block that was unlocked.
  */
 const KEPT_FIELDS: readonly string[] = [
   'uuid',
@@ -28,6 +29,7 @@ const KEPT_FIELDS: readonly string[] = [
   'isEndBlock',
   'isEndBlockManual',
   'nextBlockId',
+  'locked',
 ];
 
 /** The step settings every layout reads whatever the block; see applyStepSettings */

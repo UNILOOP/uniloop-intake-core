@@ -591,4 +591,9 @@ export const YesNoAnswerBlock: BlockDefinition = {
     label: 'Field Name',
     required: true,
   },
+  // The answer's values are fixed yes and no, so a locked block keeps only its
+  // field name; its wording stays editable.
+  lockAccess: {
+    locked: ['fieldName'],
+  },
 };

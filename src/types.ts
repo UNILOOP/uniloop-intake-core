@@ -101,6 +101,23 @@ export interface FieldNameConfig {
   required?: boolean;
 }
 
+/**
+ * What locking a block fixes, set on a {@link BlockDefinition} via `lockAccess`.
+ * Without it, a locked block's settings can't change at all.
+ */
+export interface BlockLockAccess {
+  /**
+   * Settings that can't change while the block is locked, as paths into the
+   * block's data, with `[]` for any array index: `'fieldName'`,
+   * `'options[].value'`. A change is refused when its path and a locked path
+   * overlap, so adding, removing or reordering options changes
+   * `options[].value` too. Every other setting stays editable, except `type`,
+   * `uuid` and the A/B test (`abTest`), which a lock always fixes: each A/B
+   * variant holds a full copy of the block.
+   */
+  locked: string[];
+}
+
 export interface BlockDefinition {
   type: string;
   name: string;
@@ -149,6 +166,11 @@ export interface BlockDefinition {
    * Useful for blocks that require precise visual input (signatures, file uploads, etc.)
    */
   disableAudioInput?: boolean;
+  /**
+   * Which settings stay fixed when a block of this type is locked
+   * (`locked: true` in its data). Without it, a locked block can't change.
+   */
+  lockAccess?: BlockLockAccess;
 }
 
 export type BlockParameterDef = {
@@ -726,6 +748,11 @@ export interface BlockData {
   /** A/B testing configuration */
   abTest?: ABTestConfig;
   isCustom?: boolean;
+  /**
+   * The builder won't delete or replace a locked block, and only lets its
+   * settings change as its definition's `lockAccess` allows.
+   */
+  locked?: boolean;
   /** Explicitly define the next block to navigate to (overrides sequential flow) */
   nextBlockId?: string;
   /**

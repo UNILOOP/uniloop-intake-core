@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {CommonBlockRules} from "../../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
 import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
-import { PieChart } from "lucide-react";
+import { BlockLockControl, BlockLockFieldset } from "../../common/BlockLock";
+import { BlockLockProvider } from "../../../context/BlockLockContext";
+import { isBlockLocked, isBlockUpdateAllowed } from "../../../utils/blockLock";
+import { Lock, PieChart } from "lucide-react";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
 const NavigationRulesEditor = lazy(() => import("../../common/NavigationRulesEditor").then(m => ({ default: m.NavigationRulesEditor })));
@@ -32,6 +35,16 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const blockDefinition = state.definitions.blocks[data.type];
+  const locked = isBlockLocked(data);
+
+  // Every edit to this block goes through here, so its lock holds for the
+  // settings dialog, the block's own inline editing and replace.
+  const update = (next: BlockData) => {
+    if (isBlockUpdateAllowed(data, next, blockDefinition)) onUpdate(next);
+  };
+  const remove = () => {
+    if (!locked) onRemove();
+  };
 
   if (!blockDefinition) {
     return (
@@ -40,15 +53,17 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
           <div className="flex gap-2 items-center">
             <span className="text-destructive">Unknown block type: {data.type}</span>
           </div>
-          <div className="flex gap-2">
-            <Button type="button"
-              variant="destructive"
-              size="sm"
-              onClick={onRemove}
-            >
-              Remove
-            </Button>
-          </div>
+          {!locked && (
+            <div className="flex gap-2">
+              <Button type="button"
+                variant="destructive"
+                size="sm"
+                onClick={remove}
+              >
+                Remove
+              </Button>
+            </div>
+          )}
         </CardHeader>
       </Card>
     );
@@ -71,6 +86,12 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
               A/B Testing ({data.abTest.variants.length} variants)
             </Badge>
           )}
+          {locked && (
+            <Badge variant="secondary" className="gap-1">
+              <Lock className="h-3 w-3" />
+              Locked
+            </Badge>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
           <Dialog open={isEditing} onOpenChange={setIsEditing}>
@@ -86,65 +107,83 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
               <DialogHeader>
                 <DialogTitle>Edit {blockDefinition.name}</DialogTitle>
               </DialogHeader>
-              <div className="py-4">
-                <div className="space-y-4 p-4 mt-4 border rounded-lg bg-card">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-base font-semibold">Block Configuration</Label>
+              <BlockLockProvider block={data} definition={blockDefinition}>
+                <div className="py-4">
+                  <BlockLockControl data={data} definition={blockDefinition} onUpdate={update} />
+                  <div className="space-y-4 p-4 mt-4 border rounded-lg bg-card">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-base font-semibold">Block Configuration</Label>
+                    </div>
+                    <BlockLockFieldset className="space-y-4">
+                      {(() => {
+                        const fieldConfig = resolveFieldConfig(blockDefinition.fieldConfig);
+                        return fieldConfig ? (
+                          <FieldNameField data={data} onUpdate={update} config={fieldConfig} />
+                        ) : null;
+                      })()}
+                      {blockDefinition.renderFormFields?.({
+                        data,
+                        onUpdate: update,
+                        onRemove: () => {
+                          if (locked) return;
+                          setIsEditing(false);
+                          onRemove();
+                        },
+                      })}
+                    </BlockLockFieldset>
                   </div>
-                  {(() => {
-                    const fieldConfig = resolveFieldConfig(blockDefinition.fieldConfig);
-                    return fieldConfig ? (
-                      <FieldNameField data={data} onUpdate={onUpdate} config={fieldConfig} />
-                    ) : null;
-                  })()}
-                  {blockDefinition.renderFormFields?.({
-                    data,
-                    onUpdate,
-                    onRemove: () => {
-                      setIsEditing(false);
-                      onRemove();
-                    },
-                  })}
+                  <BlockLockFieldset paths={["isEndBlock", "isEndBlockManual", "nextBlockId", "autoContinueOnSelect", "showContinueButton"]}>
+                    <CommonBlockRules data={data} onUpdate={update} />
+                  </BlockLockFieldset>
+                  <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
+                    <BlockLockFieldset paths={["abTest"]}>
+                      <ABTestEditor data={data} onUpdate={update} />
+                    </BlockLockFieldset>
+                    <BlockLockFieldset paths={["navigationRules"]}>
+                      <NavigationRulesEditor data={data} onUpdate={update} />
+                    </BlockLockFieldset>
+                    <BlockLockFieldset paths={["validationRules"]}>
+                      <ValidationRulesEditor data={data} onUpdate={update} />
+                    </BlockLockFieldset>
+                  </Suspense>
                 </div>
-                <CommonBlockRules data={data} onUpdate={onUpdate} />
-                <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
-                  <ABTestEditor data={data} onUpdate={onUpdate} />
-                  <NavigationRulesEditor data={data} onUpdate={onUpdate} />
-                  <ValidationRulesEditor data={data} onUpdate={onUpdate} />
-                </Suspense>
-              </div>
+              </BlockLockProvider>
             </DialogContent>
           </Dialog>
 
-          <Button type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsReplacing(true)}
-          >
-            Replace
-          </Button>
-          <ReplaceBlockDialog
-            block={data}
-            open={isReplacing}
-            onOpenChange={setIsReplacing}
-            onReplace={onUpdate}
-          />
+          {!locked && (
+            <>
+              <Button type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsReplacing(true)}
+              >
+                Replace
+              </Button>
+              <ReplaceBlockDialog
+                block={data}
+                open={isReplacing}
+                onOpenChange={setIsReplacing}
+                onReplace={update}
+              />
 
-          <Button type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRemove}
-          >
-            Remove
-          </Button>
+              <Button type="button"
+                variant="outline"
+                size="sm"
+                onClick={remove}
+              >
+                Remove
+              </Button>
+            </>
+          )}
         </div>
       </CardHeader>
 
       <CardContent>
         {blockDefinition.renderItem?.({
           data,
-          onUpdate,
-          onRemove,
+          onUpdate: update,
+          onRemove: remove,
         })}
       </CardContent>
 

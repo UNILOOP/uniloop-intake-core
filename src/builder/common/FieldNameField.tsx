@@ -1,8 +1,10 @@
 import React from "react";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import type { BlockData, BlockDefinition, FieldNameConfig } from "../../types";
+import type { BlockData, BlockDefinition, FieldNameConfig, NodeData } from "../../types";
 import { sanitizeFieldName } from "../../blocks/utils/GenFieldName";
+import { SurveyBuilderContext } from "../../context/SurveyBuilderContext";
+import { describeFieldNameUse, getFieldNameUses } from "../../utils/duplicateFieldNames";
 
 /**
  * FieldNameField
@@ -91,9 +93,38 @@ interface FieldNameFieldProps {
   config?: Required<FieldNameConfig>;
 }
 
+/**
+ * The questions that already save `name` elsewhere in the form, or undefined when it's free.
+ * The block itself is in the form under its saved field name, so that one use is its own.
+ */
+const findOtherUses = (rootNode: NodeData | null | undefined, data: BlockData, name: string): string[] | undefined => {
+  if (!rootNode || !name) return undefined;
+  const uses = getFieldNameUses(rootNode).get(name) ?? [];
+  const isOwnField = name === (data.fieldName ?? "").trim();
+  if (uses.length < (isOwnField ? 2 : 1)) return undefined;
+
+  let skippedOwn = false;
+  const others = uses.filter((use) => {
+    const ownBlock = use.block === data || (!!data.uuid && use.block.uuid === data.uuid);
+    if (isOwnField && !skippedOwn && ownBlock && !use.outputKey) {
+      skippedOwn = true;
+      return false;
+    }
+    return true;
+  });
+  return others.map((use) =>
+    use.block === data || (!!data.uuid && use.block.uuid === data.uuid)
+      ? "this block's output fields"
+      : `"${describeFieldNameUse(use, name)}"`,
+  );
+};
+
 export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, config }) => {
   const resolved = config ?? DEFAULT_FIELD_CONFIG;
   const field = useFieldName({ data, onUpdate });
+  // Outside the builder there is no form to check against
+  const rootNode = React.useContext(SurveyBuilderContext)?.state.rootNode;
+  const takenBy = findOtherUses(rootNode, data, sanitizeFieldName(field.value));
 
   return (
     <div className="space-y-2">
@@ -106,8 +137,17 @@ export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, 
         onChange={field.onChange}
         onBlur={field.onBlur}
         placeholder={resolved.placeholder}
+        aria-invalid={takenBy ? true : undefined}
       />
-      <p className="text-xs text-muted-foreground">{resolved.description}</p>
+      {takenBy ? (
+        <p className="text-xs text-destructive">
+          Already used by {takenBy.slice(0, 3).join(", ")}
+          {takenBy.length > 3 ? ` and ${takenBy.length - 3} more` : ""}. Pick a unique name so the answers don't
+          overwrite each other.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{resolved.description}</p>
+      )}
     </div>
   );
 };

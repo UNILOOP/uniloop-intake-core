@@ -146,6 +146,14 @@ export {
   getBlockFieldErrors,
 } from './utils/blockFields';
 export type { MappedField, BlockFieldMatch } from './utils/blockFields';
+export {
+  findDuplicateFieldNames,
+  assertUniqueFieldNames,
+  getFieldNameUses,
+  describeFieldNameUse,
+  DuplicateFieldNameError,
+} from './utils/duplicateFieldNames';
+export type { FieldNameUse, DuplicateFieldName } from './utils/duplicateFieldNames';
 
 // --------------------------------------------------------------------------
 // Types - Export specific types needed for rendering (not export *)

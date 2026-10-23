@@ -6,6 +6,8 @@ import type {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import type { AnswerViewProps } from '../types';
+import { RawAnswer } from '../renderer/answers/RawAnswer';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
@@ -827,6 +829,13 @@ const DatePickerRenderer: React.FC<DatePickerRendererProps> = ({
 };
 
 // Export the block definition
+// The date is saved as an ISO string and shown in the block's date format
+const DateAnswerView = ({ block, value }: AnswerViewProps) => {
+  const date = typeof value === 'string' || typeof value === 'number' ? new Date(value) : undefined;
+  if (!date || Number.isNaN(date.getTime())) return <RawAnswer value={value} />;
+  return <span className="text-sm">{format(date, getDateFormat(block.dateFormat as string))}</span>;
+};
+
 export const DatePickerBlock: BlockDefinition = {
   type: 'datepicker',
   name: 'Date Picker',
@@ -899,6 +908,7 @@ export const DatePickerBlock: BlockDefinition = {
     return null;
   },
   // Output schema - this block returns a date as a string (ISO format)
+  answerView: (props) => <DateAnswerView {...props} />,
   outputSchema: {
     type: 'date',
   },

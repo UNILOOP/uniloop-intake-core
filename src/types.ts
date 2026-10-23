@@ -147,6 +147,12 @@ export interface BlockDefinition {
    * - Calling onSubmit when the user completes input to advance to next question
    */
   chatRenderer?: (props: ChatRendererProps) => JSX.Element | null;
+  /**
+   * Answer view - shows a saved answer read-only, e.g. to a clinician reviewing
+   * an intake. SurveyAnswerRenderer puts it under the block's question; a block
+   * without one shows its raw value.
+   */
+  answerView?: (props: AnswerViewProps) => JSX.Element | null;
   // Validation
   validate?: (data: BlockData) => string | null;
   validateValue?: (value: any, data: BlockData) => string | null;
@@ -171,6 +177,19 @@ export interface BlockDefinition {
    * (`locked: true` in its data). Without it, a locked block can't change.
    */
   lockAccess?: BlockLockAccess;
+}
+
+/** What a block's `answerView` gets to show one saved answer. */
+export interface AnswerViewProps {
+  /** The block that saved the answer, as it is in the form */
+  block: BlockData;
+  /** The saved answer; never empty, as unanswered questions don't reach the view */
+  value: any;
+  /** Every saved answer in the form, by field name */
+  answers: Record<string, any>;
+  /** The block's question, localized; shown above the view */
+  question: string;
+  language?: string;
 }
 
 export type BlockParameterDef = {

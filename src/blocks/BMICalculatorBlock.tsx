@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BlockDefinition, ContentBlockItemProps, ThemeDefinition, ChatRendererProps } from "../types";
+import type { AnswerViewProps } from "../types";
+import { RawAnswer } from "../renderer/answers/RawAnswer";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -1145,6 +1147,36 @@ const BMIChatRenderer: React.FC<ChatRendererProps> = ({
 };
 
 // Export the block definition
+const isNumeric = (value: unknown) =>
+  (typeof value === "number" && Number.isFinite(value)) ||
+  (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)));
+
+// Height is saved in cm (metric) or inches (imperial), weight in kg or lb
+const BMIAnswerView = ({ value }: AnswerViewProps) => {
+  if (!value || typeof value !== "object" || !isNumeric(value.bmi)) return <RawAnswer value={value} />;
+  const units = value.unitSystem ?? value.unit;
+  const height = Number(value.height);
+  const heightText = !isNumeric(value.height)
+    ? undefined
+    : units === "imperial"
+      ? `${Math.floor(height / 12)} ft ${Math.round(height % 12)} in`
+      : `${height}${units === "metric" ? " cm" : ""}`;
+  const weightText = !isNumeric(value.weight)
+    ? undefined
+    : `${value.weight}${units === "imperial" ? " lb" : units === "metric" ? " kg" : ""}`;
+  const measures = [heightText && `Height ${heightText}`, weightText && `Weight ${weightText}`].filter(Boolean).join(" · ");
+
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">BMI {value.bmi}</span>
+        {value.category && <Badge variant="secondary">{value.category}</Badge>}
+      </div>
+      {measures && <p className="text-sm text-muted-foreground">{measures}</p>}
+    </div>
+  );
+};
+
 export const BMICalculatorBlock: BlockDefinition = {
   type: "bmiCalculator",
   name: "BMI Calculator",
@@ -1179,6 +1211,7 @@ export const BMICalculatorBlock: BlockDefinition = {
       weight: { type: 'number', optional: true, description: 'weight of the user' },
     }
   },
+  answerView: (props) => <BMIAnswerView {...props} />,
   outputSchema: {
     type: 'object',
     properties: {

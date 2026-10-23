@@ -146,6 +146,14 @@ export {
   getBlockFieldErrors,
 } from './utils/blockFields';
 export type { MappedField, BlockFieldMatch } from './utils/blockFields';
+export {
+  findDuplicateFieldNames,
+  assertUniqueFieldNames,
+  getFieldNameUses,
+  describeFieldNameUse,
+  DuplicateFieldNameError,
+} from './utils/duplicateFieldNames';
+export type { FieldNameUse, DuplicateFieldName } from './utils/duplicateFieldNames';
 
 // Block lock state for a custom block's settings form
 export { useBlockLock } from './context/BlockLockContext';

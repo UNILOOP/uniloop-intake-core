@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BlockDefinition, CalculatedFieldProps, ContentBlockItemProps } from "../types";
+import { AnswerText } from "../renderer/answers/AnswerText";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
@@ -169,6 +170,37 @@ return bmi > 25 ? "Overweight" : "Normal";`}</code>
 };
 
 // Component to render the block in the survey
+// Format the calculated value - now supports any type
+const formatCalculatedValue = (value: any, displayFormat?: string): string => {
+  if (value === null || value === undefined) return '';
+
+  // If it's not a number, return as string
+  if (typeof value !== 'number') {
+    return String(value);
+  }
+
+  // Apply numeric formatting only for numbers
+  if (!displayFormat) return value.toString();
+
+  switch (displayFormat) {
+    case 'currency':
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(value);
+
+    case 'percentage':
+      return `${(value * 100).toFixed(1)}%`;
+
+    default:
+      if (displayFormat.startsWith('decimal:')) {
+        const decimals = parseInt(displayFormat.split(':')[1]) || 2;
+        return value.toFixed(decimals);
+      }
+      return value.toString();
+  }
+};
+
 const CalculatedFieldItem: React.FC<ContentBlockItemProps> = ({
   data,
   onUpdate,
@@ -177,36 +209,7 @@ const CalculatedFieldItem: React.FC<ContentBlockItemProps> = ({
   // calculated values from the survey engine that has access to all form data
   const [displayValue, setDisplayValue] = useState<any>(data.calculatedValue || null);
 
-  // Format the calculated value - now supports any type
-  const formatValue = (value: any): string => {
-    if (value === null || value === undefined) return '';
-    
-    // If it's not a number, return as string
-    if (typeof value !== 'number') {
-      return String(value);
-    }
-
-    // Apply numeric formatting only for numbers
-    if (!data.displayFormat) return value.toString();
-
-    switch (data.displayFormat) {
-      case 'currency':
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD'
-        }).format(value);
-      
-      case 'percentage':
-        return `${(value * 100).toFixed(1)}%`;
-      
-      default:
-        if (data.displayFormat.startsWith('decimal:')) {
-          const decimals = parseInt(data.displayFormat.split(':')[1]) || 2;
-          return value.toFixed(decimals);
-        }
-        return value.toString();
-    }
-  };
+  const formatValue = (value: any) => formatCalculatedValue(value, data.displayFormat);
 
   // Update the stored calculated value when it changes
   useEffect(() => {
@@ -545,6 +548,7 @@ return "Low Risk";`,
   },
   // Output schema - this block returns a calculated value (number or string based on formula)
   // Note: Actual type depends on resultType configuration
+  answerView: ({ block, value }) => <AnswerText>{formatCalculatedValue(value, block.displayFormat)}</AnswerText>,
   outputSchema: {
     type: 'number'
   },

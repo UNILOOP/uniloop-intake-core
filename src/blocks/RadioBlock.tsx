@@ -6,6 +6,7 @@ import {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import { OptionChips, toOptionChoices } from '../renderer/answers/OptionChips';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -525,6 +526,7 @@ export const RadioBlock: BlockDefinition = {
       value: { type: 'string', description: 'Selected Option' },
     },
   },
+  answerView: ({ block, value }) => <OptionChips options={toOptionChoices(block.options)} value={value} />,
   outputSchema: {
     type: 'string',
   },

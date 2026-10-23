@@ -588,6 +588,7 @@ export const RangeBlock: BlockDefinition = {
     type: 'number',
   },
   // Output schema - this block returns a numeric value (slider position)
+  answerView: ({ value }) => <span className="text-sm">{String(value)}</span>,
   outputSchema: {
     type: 'number',
   },

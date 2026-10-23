@@ -13,6 +13,9 @@ import type {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import type { AnswerViewProps } from '../types';
+import { format } from 'date-fns';
+import { RawAnswer } from '../renderer/answers/RawAnswer';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
@@ -694,6 +697,28 @@ const AgreementChatRenderer: React.FC<ChatRendererProps> = ({
 // Unified Block Definition
 // --------------------
 
+// Shows the signer, the signature (only as an image data URL) and when it was signed
+const AgreementAnswerView = ({ value }: AnswerViewProps) => {
+  if (!value || typeof value !== 'object') return <RawAnswer value={value} />;
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  const signature =
+    typeof value.signatureDataUrl === 'string' && value.signatureDataUrl.startsWith('data:image/')
+      ? value.signatureDataUrl
+      : undefined;
+  if (!name && !signature) return <RawAnswer value={value} />;
+  const signedAt = typeof value.timestamp === 'string' ? new Date(value.timestamp) : undefined;
+
+  return (
+    <div className="space-y-2">
+      {name && <p className="text-sm font-medium">{name}</p>}
+      {signature && <img src={signature} alt="Signature" className="h-20 max-w-full rounded-md border bg-white p-1" />}
+      {signedAt && !Number.isNaN(signedAt.getTime()) && (
+        <p className="text-xs text-muted-foreground">Signed {format(signedAt, 'MMM d, yyyy h:mm a')}</p>
+      )}
+    </div>
+  );
+};
+
 export const AgreementBlock: BlockDefinition = {
   type: 'agreement',
   name: 'Agreement (Name + Signature)',
@@ -745,6 +770,7 @@ export const AgreementBlock: BlockDefinition = {
     return null;
   },
   // Output schema - this block returns agreement data with name and signature
+  answerView: (props) => <AgreementAnswerView {...props} />,
   outputSchema: {
     type: 'object',
     properties: {

@@ -6,6 +6,7 @@ import {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import { OptionChips, toOptionChoices } from '../renderer/answers/OptionChips';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -669,6 +670,7 @@ export const CheckboxBlock: BlockDefinition = {
     },
   },
   // Output schema - this block returns an array of strings (selected option values)
+  answerView: ({ block, value }) => <OptionChips options={toOptionChoices(block.options)} value={value} />,
   outputSchema: {
     type: 'array',
     items: {

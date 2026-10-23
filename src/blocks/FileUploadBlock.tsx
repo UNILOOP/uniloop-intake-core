@@ -6,6 +6,8 @@ import type {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import type { AnswerViewProps } from '../types';
+import { FileText } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
@@ -682,6 +684,60 @@ const FileUploadChatRenderer: React.FC<ChatRendererProps> = ({
 };
 
 // Export the block definition
+const isWebLink = (url: unknown): url is string => typeof url === 'string' && /^https?:\/\//i.test(url);
+
+const fileNameFromUrl = (url: string) => {
+  try {
+    return decodeURIComponent(new URL(url).pathname.split('/').pop() || '') || url;
+  } catch {
+    return url;
+  }
+};
+
+// Files are saved as links, or as { name, type, size, url } objects; each shows as a card
+const FileUploadAnswerView = ({ value }: AnswerViewProps) => {
+  const files: any[] = Array.isArray(value) ? value : [value];
+  const repeats = new Map<string, number>();
+  return (
+    <div className="space-y-2">
+      {files.map((file) => {
+        const url = typeof file === 'string' ? file : file?.url;
+        const id = String(url ?? file?.name ?? '');
+        const repeat = (repeats.get(id) ?? 0) + 1;
+        repeats.set(id, repeat);
+        const name =
+          (typeof file === 'object' && file?.name) || (isWebLink(url) ? fileNameFromUrl(url) : 'Uploaded file');
+        const details =
+          file && typeof file === 'object'
+            ? [file.type, typeof file.size === 'number' ? `${(file.size / 1024).toFixed(2)} KB` : undefined]
+                .filter(Boolean)
+                .join(' • ')
+            : '';
+        return (
+          <div key={`${id}-${repeat}`} className="flex items-center gap-2 rounded-md bg-muted p-3">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              {isWebLink(url) ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block truncate text-sm font-medium underline"
+                >
+                  {name}
+                </a>
+              ) : (
+                <p className="truncate text-sm font-medium">{name}</p>
+              )}
+              {details && <p className="truncate text-xs text-muted-foreground">{details}</p>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export const FileUploadBlock: BlockDefinition = {
   type: 'fileupload',
   name: 'File Upload',
@@ -768,6 +824,7 @@ export const FileUploadBlock: BlockDefinition = {
   },
   // Output schema - this block returns an array of strings (file URLs). The 'uri' format keeps
   // Replace from offering it for a multi-select, whose strings are option values.
+  answerView: (props) => <FileUploadAnswerView {...props} />,
   outputSchema: {
     type: 'array',
     items: { type: 'string', format: 'uri' },

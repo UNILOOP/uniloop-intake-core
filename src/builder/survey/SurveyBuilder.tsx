@@ -38,6 +38,11 @@ interface SurveyBuilderProps {
   mode?: SurveyMode;
   editorType?: EditorMode;
   /**
+   * Hides the "Lock block" control from block settings, so editors can't lock
+   * or unlock blocks. Blocks saved with `locked: true` stay locked.
+   */
+  hideBlockLockControls?: boolean;
+  /**
    * Replaces system blocks with registered blocks, keyed by system block type,
    * e.g. `{ yesNoAnswer: 'myYesNo' }`. The builder shows and edits the
    * registered block in place of the system block, and new blocks keep the
@@ -67,10 +72,11 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   logo = null,
   mode = 'pageless',
   editorType = 'full',
+  hideBlockLockControls = false,
   blockOverrides,
 }, ref) => {
   return (
-    <SurveyBuilderProvider initialData={initialData} customData={customData} blockOverrides={blockOverrides} mode={mode}>
+    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} mode={mode}>
       <SurveyBuilderContent
         ref={ref}
         onDataChange={onDataChange}

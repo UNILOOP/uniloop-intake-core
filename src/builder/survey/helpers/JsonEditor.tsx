@@ -10,6 +10,7 @@ import { NodeData, BlockData } from "../../../types";
 import { ensureNodeUuids } from "../../../utils/nodeUtils";
 import { detectSurveyMode } from "../../../utils/surveyUtils";
 import { DEFAULT_LANGUAGE_CODE } from "../../../utils/languages";
+import { assertLockedBlocksPreserved } from "../../../utils/blockLock";
 
 /**
  * Converts a paged survey structure to pageless by extracting all blocks from pages
@@ -128,6 +129,8 @@ export const JsonEditor: React.FC = () => {
       // Ensure all nodes have UUIDs
       const rootNodeWithUuids = ensureNodeUuids(rootNodeToImport);
 
+      assertLockedBlocksPreserved(state.rootNode, rootNodeWithUuids, state.definitions.blocks);
+
       importSurvey({
         rootNode: rootNodeWithUuids,
         localizations: data.localizations || { [DEFAULT_LANGUAGE_CODE]: {} },
@@ -139,6 +142,7 @@ export const JsonEditor: React.FC = () => {
         setSuccess(null);
       }, 3000);
     } catch (err) {
+      setSuccess(null);
       setError(`Error importing survey: ${err instanceof Error ? err.message : String(err)}`);
     }
   };

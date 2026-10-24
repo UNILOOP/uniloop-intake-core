@@ -12,6 +12,9 @@ import { ValidationRulesEditor } from "../common/ValidationRulesEditor";
 import { CommonBlockRules } from "../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../common/FieldNameField";
 import { ABTestEditor } from "../common/ABTestEditor";
+import { BlockLockControl, BlockLockFieldset } from "../common/BlockLock";
+import { BlockLockProvider } from "../../context/BlockLockContext";
+import { isBlockUpdateAllowed } from "../../utils/blockLock";
 
 interface NodeConfigPanelProps {
   nodeId: string | null;
@@ -124,6 +127,8 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
   };
 
   const handleBlockUpdate = (updatedData: BlockData) => {
+    const current = nodeData as BlockData;
+    if (!isBlockUpdateAllowed(current, updatedData, state.definitions.blocks[current.type])) return;
     onUpdate(nodeId, updatedData);
   };
 
@@ -146,56 +151,72 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
             </div>
           </div>
 
-          <NavigationRulesEditor
-            data={blockData}
-            onUpdate={handleBlockUpdate}
-            editRuleIndex={editRuleIndex}
-            hideRemoveButton={hideRemoveButton}
-          />
+          <BlockLockProvider block={blockData} definition={definition}>
+            <BlockLockFieldset paths={["navigationRules"]}>
+              <NavigationRulesEditor
+                data={blockData}
+                onUpdate={handleBlockUpdate}
+                editRuleIndex={editRuleIndex}
+                hideRemoveButton={hideRemoveButton}
+              />
+            </BlockLockFieldset>
+          </BlockLockProvider>
         </div>
       );
     }
     
     // Full mode shows all sections
     return (
-      <div className="space-y-4">
-        {/* Block-specific configuration using renderFormFields */}
-        <div className="space-y-4 p-4 mt-4 border rounded-lg bg-card">
-          <div className="flex items-center gap-2">
-            <Label className="text-base font-semibold">Block Configuration</Label>
-          </div>
-          {definition && definition.renderFormFields && (
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Block Configuration</Label>
-              {(() => {
-                const fieldConfig = resolveFieldConfig(definition.fieldConfig);
-                return fieldConfig ? (
-                  <FieldNameField data={blockData} onUpdate={handleBlockUpdate} config={fieldConfig} />
-                ) : null;
-              })()}
-              {definition.renderFormFields({
-                data: blockData,
-                onUpdate: handleBlockUpdate,
-                onRemove: () => {}
-              })}
+      <BlockLockProvider block={blockData} definition={definition}>
+        <div className="space-y-4">
+          <BlockLockControl data={blockData} definition={definition} onUpdate={handleBlockUpdate} />
+
+          {/* Block-specific configuration using renderFormFields */}
+          <div className="space-y-4 p-4 mt-4 border rounded-lg bg-card">
+            <div className="flex items-center gap-2">
+              <Label className="text-base font-semibold">Block Configuration</Label>
             </div>
-          )}
+            {definition && definition.renderFormFields && (
+              <BlockLockFieldset>
+                <Label className="text-sm font-medium mb-2 block">Block Configuration</Label>
+                {(() => {
+                  const fieldConfig = resolveFieldConfig(definition.fieldConfig);
+                  return fieldConfig ? (
+                    <FieldNameField data={blockData} onUpdate={handleBlockUpdate} config={fieldConfig} />
+                  ) : null;
+                })()}
+                {definition.renderFormFields({
+                  data: blockData,
+                  onUpdate: handleBlockUpdate,
+                  onRemove: () => {}
+                })}
+              </BlockLockFieldset>
+            )}
+          </div>
+
+
+          {/* Common Block Rules */}
+          <BlockLockFieldset paths={["isEndBlock", "isEndBlockManual", "nextBlockId", "autoContinueOnSelect", "showContinueButton"]}>
+            <CommonBlockRules
+              data={blockData}
+              onUpdate={handleBlockUpdate}
+            />
+          </BlockLockFieldset>
+
+          <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
+            <BlockLockFieldset paths={["abTest"]}>
+              <ABTestEditor data={blockData} onUpdate={handleBlockUpdate} />
+            </BlockLockFieldset>
+            <BlockLockFieldset paths={["navigationRules"]}>
+              <NavigationRulesEditor data={blockData} onUpdate={handleBlockUpdate} />
+            </BlockLockFieldset>
+            <BlockLockFieldset paths={["validationRules"]}>
+              <ValidationRulesEditor data={blockData} onUpdate={handleBlockUpdate} />
+            </BlockLockFieldset>
+          </Suspense>
+
         </div>
-
-
-        {/* Common Block Rules */}
-        <CommonBlockRules 
-          data={blockData} 
-          onUpdate={handleBlockUpdate} 
-        />
-
-        <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
-          <ABTestEditor data={blockData} onUpdate={handleBlockUpdate} />
-          <NavigationRulesEditor data={blockData} onUpdate={handleBlockUpdate} />
-          <ValidationRulesEditor data={blockData} onUpdate={handleBlockUpdate} />
-        </Suspense>
-
-      </div>
+      </BlockLockProvider>
     );
   };
 

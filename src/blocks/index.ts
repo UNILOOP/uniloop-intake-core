@@ -203,9 +203,9 @@ function withOverrideFallback<P>(
         key: overrideType,
         systemType,
         overrideType,
-        fallback: fallback ? React.createElement(RenderWith, { render: fallback, props }) : null,
+        fallback: fallback ? React.createElement(RenderWith<P>, { render: fallback, props }) : null,
       },
-      React.createElement(RenderWith, { render, props })
+      React.createElement(RenderWith<P>, { render, props })
     );
 }
 

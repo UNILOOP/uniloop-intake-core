@@ -6,7 +6,7 @@ import type {
   OutputSchemaObject,
   OutputSchemaScalar,
 } from '../types';
-import { resolveUnionSchema } from './outputSchema';
+import { getObjectOutputSchema, resolveUnionSchema } from './outputSchema';
 
 /**
  * Utility functions for replacing a block with a block of another type
@@ -144,6 +144,26 @@ function applyStepSettings(
   }
 }
 
+/**
+ * Keep the output keys the old block saved under their own field names, where the new block
+ * outputs the same key. A key it doesn't output is dropped, and listed.
+ */
+function keepOutputFields(
+  source: BlockData,
+  next: BlockDefinition,
+  replacement: BlockData,
+  droppedFields: string[]
+): void {
+  const outputFields = source.outputFields;
+  if (!outputFields || typeof outputFields !== 'object') return;
+
+  const properties = getObjectOutputSchema(next, replacement)?.properties ?? {};
+  const entries = Object.entries(outputFields);
+  const kept = entries.filter(([key]) => key in properties);
+  if (kept.length > 0) replacement.outputFields = Object.fromEntries(kept);
+  if (kept.length < entries.length) droppedFields.push('outputFields');
+}
+
 function getDefaultData(definition: BlockDefinition): BlockData {
   return definition.generateDefaultData
     ? definition.generateDefaultData()
@@ -253,7 +273,8 @@ export function getReplacementBlockTypes(
 /**
  * Replace a block with a block of another type. The replacement keeps the block's id,
  * field name, rules and links, its step settings where the new block can use them (see
- * applyStepSettings), and every other setting the new block also has, when the value fits
+ * applyStepSettings), the output keys it saves under their own field names where the new
+ * block outputs them (see keepOutputFields), and every other setting the new block also has, when the value fits
  * the shape of the new block's default for it (so options carry over whole, extra keys
  * included). Settings the new block has but the old block doesn't, or has empty, start from
  * the new block's defaults. The old block's other settings are dropped, and listed unless
@@ -288,6 +309,7 @@ export function replaceBlock(
   const source: BlockData = JSON.parse(JSON.stringify(block));
   for (const [field, value] of Object.entries(source)) {
     if (value === undefined || TYPE_FIELDS.includes(field) || STEP_FIELDS.includes(field)) continue;
+    if (field === 'outputFields') continue; // see keepOutputFields
 
     if (kept.includes(field)) {
       replacement[field] = value;
@@ -305,6 +327,7 @@ export function replaceBlock(
     replacement[newShapeField] = data[newShapeField];
   }
   applyStepSettings(source, data, replacement, droppedFields);
+  keepOutputFields(source, next, replacement, droppedFields);
   clearUnmatchedDefault(replacement, resolveOutput(next.outputSchema, replacement)?.type === 'array');
 
   return { data: replacement, droppedFields };

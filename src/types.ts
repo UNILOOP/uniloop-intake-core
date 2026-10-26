@@ -112,7 +112,7 @@ export interface BlockLockAccess {
    * `'options[].value'`. A change is refused when its path and a locked path
    * overlap, so adding, removing or reordering options changes
    * `options[].value` too. Every other setting stays editable, except `type`,
-   * `uuid` and the A/B test (`abTest`), which a lock always fixes: each A/B
+   * `uuid`, `fieldName`, `outputFields` and the A/B test (`abTest`), which a lock always fixes: each A/B
    * variant holds a full copy of the block.
    */
   locked: string[];
@@ -522,6 +522,8 @@ export interface BlockRendererProps {
   onChange?: (value: any) => void;
   onBlur?: () => void;
   error?: string;
+  /** Errors for the block's mapped output keys, keyed by output schema key */
+  fieldErrors?: Record<string, string>;
   disabled?: boolean;
   // Fixed: Use React.FC specifically instead of ComponentType
   customComponents?: Record<string, React.FC<BlockRendererProps>>;
@@ -765,7 +767,24 @@ export interface BlockData {
    * When true, the voice input button will be hidden and only visual input allowed.
    */
   disableAudioInput?: boolean;
+  /**
+   * Saves keys of the block's object output under their own field names, so rules,
+   * validation and navigation can use each key like any other field. Keyed by output
+   * schema key. A key without a fieldName isn't saved on its own.
+   */
+  outputFields?: Record<string, OutputFieldMapping>;
   [key: string]: any;
+}
+
+/** Where one output key of a block is saved, and the question it answers */
+export interface OutputFieldMapping {
+  fieldName?: string;
+  /** Falls back to the output property's description, then the block label and key */
+  question?: string;
+  /** Saved output metadata for consumers that do not load the block definition. */
+  type?: OutputSchemaObject['properties'][string]['type'];
+  options?: OutputSchemaOption[];
+  excludeFromRules?: boolean;
 }
 
 export interface NodeData {

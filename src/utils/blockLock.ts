@@ -1,9 +1,9 @@
 import type { BlockData, BlockDefinition, NodeData } from '../types';
 
-// A locked block never changes type or identity, whatever its lockAccess says.
+// A locked block never changes type, identity, or saved field mappings, whatever its lockAccess says.
 // Its A/B test is fixed too: each variant holds a full copy of the block, and at
 // runtime a variant's settings replace the block's own, locked ones included.
-const ALWAYS_LOCKED = ['type', 'uuid', 'abTest'];
+const ALWAYS_LOCKED = ['type', 'uuid', 'fieldName', 'outputFields', 'abTest'];
 
 // The settings that decide a block's next step, apart from its navigation rules.
 const NEXT_STEP_PATHS = ['nextBlockId', 'isEndBlock', 'isEndBlockManual'];

@@ -9,6 +9,7 @@ import { BlockData } from "../../../types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 import {CommonBlockRules} from "../../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
+import { OutputFieldsEditor } from "../../common/OutputFieldsEditor";
 import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
 import { BlockLockControl, BlockLockFieldset } from "../../common/BlockLock";
 import { BlockLockProvider } from "../../../context/BlockLockContext";
@@ -132,6 +133,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                       })}
                     </BlockLockFieldset>
                   </div>
+                  <OutputFieldsEditor data={data} onUpdate={update} />
                   <BlockLockFieldset paths={["isEndBlock", "isEndBlockManual", "nextBlockId", "autoContinueOnSelect", "showContinueButton"]}>
                     <CommonBlockRules data={data} onUpdate={update} />
                   </BlockLockFieldset>

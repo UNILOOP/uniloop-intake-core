@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState, Fragment } from 'react';
 import { useSurveyForm } from '../../context/SurveyFormContext';
 import { BlockRenderer } from '../renderers/BlockRenderer';
+import { getBlockFieldErrors } from '../../utils/blockFields';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -330,6 +331,10 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
                           ]
                         : undefined
                     }
+                    fieldErrors={getBlockFieldErrors(
+                      currentPageBlocks[currentBlockIndex],
+                      errors
+                    )}
                     ref={firstInputRef}
                     theme={theme}
                   />

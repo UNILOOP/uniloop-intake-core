@@ -23,6 +23,13 @@ import {
 import { ThemeDefinition, themes } from "../themes";
 import { resolveBlockDefinition } from "../blocks";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
+import {
+  expandBlockValue,
+  expandSavedValues,
+  findBlockForField,
+  getBlockFieldNames,
+  getFieldValidationRules,
+} from "../utils/blockFields";
 
 // Navigation history entry - uses UUIDs for stable references across conditional navigation
 interface NavigationHistoryEntry {
@@ -176,7 +183,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const isInitialRender = useRef(true);
 
   const [values, setValues] = useState<Record<string, any>>(() => {
-    const initial = { ...defaultValues, ...(initialValues || {}) };
+    const initial = expandSavedValues(pages.flat(), { ...defaultValues, ...(initialValues || {}) });
     if(debug) {
       console.log('[SurveyFormProvider] Initial state values:', initial);
       console.log('[SurveyFormProvider] Starting at page:', startPage);
@@ -281,13 +288,17 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     }
   }, []); // Only run once on mount
 
+  // Read through a ref, so the effect below still runs only when initialValues changes
+  const allBlocksRef = useRef<BlockData[]>([]);
+  allBlocksRef.current = pages.flat();
+
   // Update values when initialValues changes (for dynamic loading)
   useEffect(() => {
     if (initialValues && Object.keys(initialValues).length > 0) {
       if(debug)
         console.log('[SurveyFormProvider] Updating values from initialValues:', initialValues);
       setValues(prev => {
-        const updated = { ...prev, ...initialValues };
+        const updated = { ...prev, ...expandSavedValues(allBlocksRef.current, initialValues) };
         if(debug)
           console.log('[SurveyFormProvider] Updated values:', updated);
         return updated;
@@ -711,14 +722,18 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     // First check for block-level validation using validateValue method.
     // Prefer the block currently being answered so a duplicate field name on
     // another page cannot shadow its rules.
+    // A field name can also be one of a block's mapped output keys.
     const activeBlock = (pages[currentPage] || [])[currentBlockIndex];
     const allBlocks = pages.flat();
-    const block = activeBlock?.fieldName === fieldName
+    const block = getBlockFieldNames(activeBlock).includes(fieldName)
       ? activeBlock
-      : allBlocks.find(block => block.fieldName === fieldName);
+      : findBlockForField(allBlocks, fieldName)?.block;
     
     if (block) {
-      const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
+      // validateValue checks the block's whole answer, so it runs for its own field only
+      const blockDefinition = block.fieldName === fieldName
+        ? resolveBlockDefinition(block.type, blockOverrides)
+        : undefined;
       if (blockDefinition?.validateValue) {
         try {
           const blockValidationError = blockDefinition.validateValue(value, block);
@@ -731,29 +746,27 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         }
       }
 
-      // Check custom validation rules
-      if (block.validationRules && Array.isArray(block.validationRules)) {
-        for (const rule of block.validationRules) {
-          try {
-            // Skip if there's a condition and it doesn't evaluate to true
-            if (rule.condition) {
-              const conditionResult = evaluateConditionWithContext(rule.condition, validationContext);
-              if (!conditionResult) {
-                continue;
-              }
+      // Check custom validation rules (a mapped key gets the rules that test it)
+      for (const rule of getFieldValidationRules(block, fieldName)) {
+        try {
+          // Skip if there's a condition and it doesn't evaluate to true
+          if (rule.condition) {
+            const conditionResult = evaluateConditionWithContext(rule.condition, validationContext);
+            if (!conditionResult) {
+              continue;
             }
-
-            // Apply the validation rule
-            const validationFunction = validationRuleToFunction(rule);
-            const validationError = validationFunction(value, validationContext);
-            
-            if (validationError && rule.severity !== 'warning') {
-              return validationError;
-            }
-          } catch (error) {
-            console.error(`Error in custom validation rule for field ${fieldName}:`, error);
-            return `Validation error: ${(error as Error).message}`;
           }
+
+          // Apply the validation rule
+          const validationFunction = validationRuleToFunction(rule);
+          const validationError = validationFunction(value, validationContext);
+
+          if (validationError && rule.severity !== 'warning') {
+            return validationError;
+          }
+        } catch (error) {
+          console.error(`Error in custom validation rule for field ${fieldName}:`, error);
+          return `Validation error: ${(error as Error).message}`;
         }
       }
     }
@@ -776,14 +789,12 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   // Calculate if the current page is valid
   const currentPageBlocks = pages[currentPage] || [];
   const visibleCurrentPageBlocks = getVisibleBlocks(currentPageBlocks);
-  const currentPageFields = visibleCurrentPageBlocks
-    .filter(block => block.fieldName)
-    .map(block => block.fieldName as string);
+  const currentPageFields = visibleCurrentPageBlocks.flatMap(block => getBlockFieldNames(block));
 
   // Check if current block is valid (for stepper layout)
   const currentBlock = currentPageBlocks[currentBlockIndex];
-  const isCurrentBlockValid = !currentBlock?.fieldName || 
-    (!errors[currentBlock.fieldName] && !conditionalErrors[currentBlock.fieldName]);
+  const isCurrentBlockValid = getBlockFieldNames(currentBlock)
+    .every(field => !errors[field] && !conditionalErrors[field]);
 
   // Check if entire current page is valid (for page-by-page layout)
   const isCurrentPageValid = currentPageFields.every(field => !errors[field] && !conditionalErrors[field]);
@@ -793,8 +804,16 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
   // Enhanced setValue
   const setValue = (field: string, value: any) => {
+    // The block that saves this answer, preferring the one being answered
+    const activeBlock = (pages[currentPage] || [])[currentBlockIndex];
+    const block = activeBlock?.fieldName === field
+      ? activeBlock
+      : pages.flat().find(item => item.fieldName === field);
+    const fieldNames = block ? getBlockFieldNames(block) : [field];
+
     setValues(prev => {
-      const updatedValues = { ...prev, [field]: value };
+      // A block's mapped output keys are saved in the same update as its answer
+      const updatedValues = { ...prev, [field]: value, ...expandBlockValue(block, value) };
 
       const currentPageItem = pages[currentPage];
       if (Array.isArray(currentPageItem) && currentPageItem.length > 0) {
@@ -816,16 +835,17 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         }
       }
 
-      const validationError = validateField(field, value, updatedValues);
-      if (validationError) {
-        setConditionalErrors(prev => ({ ...prev, [field]: validationError }));
-      } else {
-        setConditionalErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[field];
-          return newErrors;
-        });
-      }
+      const validationErrors = fieldNames.map(name =>
+        [name, validateField(name, updatedValues[name], updatedValues)] as const
+      );
+      setConditionalErrors(prev => {
+        const newErrors = { ...prev };
+        for (const [name, validationError] of validationErrors) {
+          if (validationError) newErrors[name] = validationError;
+          else delete newErrors[name];
+        }
+        return newErrors;
+      });
 
       return updatedValues;
     });
@@ -868,32 +888,38 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     const pageBlocks = pages[currentPage] || [];
     const currentBlock = pageBlocks[currentBlockIndex];
 
-    const mergedValues = fValue ? { ...values, ...fValue } : values;
+    // The block's mapped output keys come from its answer, so navigation rules on
+    // them see this answer too
+    const answer = fValue ? { ...values, ...fValue }[currentBlock?.fieldName ?? ''] : undefined;
+    const update = fValue ? { ...fValue, ...expandBlockValue(currentBlock, answer) } : undefined;
+    const mergedValues = update ? { ...values, ...update } : values;
 
-    if (fValue) {
-      setValues(prev => ({ ...prev, ...fValue }));
+    if (update) {
+      setValues(prev => ({ ...prev, ...update }));
     }
 
-    // Validate the current field against the values being submitted before any
+    // Validate the current fields against the values being submitted before any
     // navigation or submission. Auto-continue calls this synchronously right after
     // the selection, so the `values` render snapshot may not include the new
     // answer yet; `mergedValues` always does.
-    if (currentBlock?.fieldName) {
-      const fieldName = currentBlock.fieldName;
-      const currentValue = mergedValues[fieldName];
+    const fieldNames = getBlockFieldNames(currentBlock);
+    if (fieldNames.length > 0) {
+      const validationErrors = fieldNames.map(name =>
+        [name, validateField(name, mergedValues[name], mergedValues)] as const
+      );
 
-      const validationError = validateField(fieldName, currentValue, mergedValues);
-      if (validationError) {
-        setConditionalErrors(prev => ({ ...prev, [fieldName]: validationError }));
-        return; // Don't proceed if validation fails
-      }
-
-      // Clear any existing error for this field
       setConditionalErrors(prev => {
         const newErrors = { ...prev };
-        delete newErrors[fieldName];
+        for (const [name, validationError] of validationErrors) {
+          if (validationError) newErrors[name] = validationError;
+          else delete newErrors[name];
+        }
         return newErrors;
       });
+
+      if (validationErrors.some(([, validationError]) => validationError)) {
+        return; // Don't proceed if validation fails
+      }
     }
 
     if (currentBlock?.isEndBlock) {

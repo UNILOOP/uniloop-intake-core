@@ -133,6 +133,19 @@ export {
 // Field name helpers (value-block field name support)
 export { generateFieldName, sanitizeFieldName } from './blocks/utils/GenFieldName';
 export { FieldNameField, useFieldName, resolveFieldConfig } from './builder/common/FieldNameField';
+export {
+  getMappedFields,
+  getBlockFieldNames,
+  expandBlockValue,
+  expandSavedValues,
+  findBlockForField,
+  getFieldQuestion,
+  resolveFieldQuestion,
+  getDefaultFieldQuestion,
+  getFieldValidationRules,
+  getBlockFieldErrors,
+} from './utils/blockFields';
+export type { MappedField, BlockFieldMatch } from './utils/blockFields';
 
 // Block lock state for a custom block's settings form
 export { useBlockLock } from './context/BlockLockContext';
@@ -160,6 +173,7 @@ export type {
   OutputSchemaArray,
   OutputSchemaObject,
   OutputSchemaOption,
+  OutputFieldMapping,
   OutputSchemaUnion,
 
   // Node types

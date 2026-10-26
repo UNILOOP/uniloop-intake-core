@@ -172,7 +172,7 @@ const SurveyBuilderContent = forwardRef<SurveyBuilderHandle, Omit<SurveyBuilderP
   // 4. Notify parent only on real data changes
   React.useEffect(() => {
     onDataChange?.(exportSurvey());
-  }, [state.rootNode, state.localizations, state.theme, onDataChange]);
+  }, [state.rootNode, state.localizations, state.theme, state.definitions.blocks, onDataChange]);
 
   // Create root node if none exists
   const handleCreateRootNode = React.useCallback(() => {

@@ -492,6 +492,37 @@ Saved or prefilled
 answers (`defaultValues`, `initialValues`) fill in their mapped keys when the form loads. The page-by-page
 and stepper layouts pass `fieldErrors`; the chat and voice layouts don't yet.
 
+### Showing Saved Answers
+
+`SurveyAnswerRenderer` lists a form's saved answers read-only, in form order, for pages such as
+an order's intake responses. Each answer is shown by its block's `answerView`. A block registered
+with `registerBlock` brings its view with it, so the renderer needs only the form and the answers:
+
+```tsx
+import { SurveyAnswerRenderer, registerBlock, AnswerText } from "survey-form-package/src";
+
+registerBlock({
+  ...MyCustomBlock,
+  // Hooks work here: the view renders as its own component
+  answerView: ({ value }) => <AnswerText>{value?.cardholder}</AnswerText>,
+});
+
+<SurveyAnswerRenderer form={surveyData} answers={responses} />
+```
+
+- A block without an `answerView` shows its raw answer. So does a view that throws, until the
+  answer or the view changes; the error is logged.
+- Each output key saved under its own field name follows its block, with its own question and its
+  output property's option labels (from the block definition, else as saved with the form). A key
+  saved without its block's answer still shows.
+- `blockDefinitions` is only for explicit overrides: a definition passed there wins over the
+  registered one for that type. Pass `blockOverrides` to show an overriding block's view.
+- `showUnanswered` lists questions with no answer as "Not provided", and `showBlockType` tags
+  each question with its block type.
+- The shared pieces are exported so a view can match the standard ones: `AnswerItem`,
+  `OptionChips` and `toOptionChoices`, `AnswerGrid`, `AnswerText`, `BooleanAnswer`, `NotProvided`
+  and `RawAnswer`.
+
 ## Troubleshooting
 
 ### Block Not Rendering in Survey

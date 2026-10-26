@@ -1,5 +1,5 @@
 import type { BlockData, NodeData } from '../types';
-import { getFieldQuestion } from './blockFields';
+import { getDefaultFieldQuestion } from './blockFields';
 
 /** One place a field name is saved: a block's own field, or one of its mapped output keys */
 export interface FieldNameUse {
@@ -24,7 +24,7 @@ export class DuplicateFieldNameError extends Error {
   constructor(duplicates: DuplicateFieldName[]) {
     const list = duplicates
       .map(({ fieldName, uses }) => {
-        const questions = uses.map((use) => `"${describeFieldNameUse(use, fieldName)}"`).join(', ');
+        const questions = uses.map((use) => `"${describeFieldNameUse(use)}"`).join(', ');
         return `"${fieldName}" (${questions})`;
       })
       .join('; ');
@@ -35,11 +35,14 @@ export class DuplicateFieldNameError extends Error {
 }
 
 /**
- * Get the question a use of a field name answers, for messages: the block's label, or the
- * mapped key's question
+ * Get the question a use of a field name answers, for messages: the block's label, or its
+ * output key's question. Each mapped key reads its own mapping, so two keys that share a
+ * name show their own questions.
  */
-export function describeFieldNameUse(use: FieldNameUse, fieldName: string): string {
-  return getFieldQuestion(use.block, fieldName) || use.block.type;
+export function describeFieldNameUse(use: FieldNameUse): string {
+  const { block, outputKey } = use;
+  if (outputKey === undefined) return block.label || block.name || block.type;
+  return block.outputFields?.[outputKey]?.question?.trim() || getDefaultFieldQuestion(block, outputKey);
 }
 
 /**

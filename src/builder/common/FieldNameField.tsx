@@ -116,7 +116,7 @@ const findOtherUses = (rootNode: NodeData | null | undefined, data: BlockData, n
   return others.map((use) =>
     use.block === data || (!!data.uuid && use.block.uuid === data.uuid)
       ? "this block's output fields"
-      : `"${describeFieldNameUse(use, name)}"`,
+      : `"${describeFieldNameUse(use)}"`,
   );
 };
 

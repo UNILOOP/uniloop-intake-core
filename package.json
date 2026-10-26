@@ -14,6 +14,7 @@
     "build": "tsup",
     "dev": "tsup src/index.tsx --format cjs,esm --dts --watch",
     "lint": "biome lint .",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

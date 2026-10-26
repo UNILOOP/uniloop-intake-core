@@ -130,6 +130,30 @@ export {
   resolveBlockDefinition,
 } from './blocks';
 
+// Answer views (saved answers shown read-only, e.g. for clinicians)
+export {
+  SurveyAnswerRenderer,
+  AnswerItem,
+  OptionChips,
+  toOptionChoices,
+  AnswerGrid,
+  AnswerText,
+  BooleanAnswer,
+  NotProvided,
+  RawAnswer,
+  isEmptyAnswer,
+  collectAnswerBlocks,
+  pickAnswerBlocks,
+} from './renderer/answers';
+export type {
+  SurveyAnswerRendererProps,
+  AnswerItemProps,
+  OptionChipsProps,
+  OptionChoice,
+  AnswerGridProps,
+  AnswerForm,
+} from './renderer/answers';
+
 // Field name helpers (value-block field name support)
 export { generateFieldName, sanitizeFieldName } from './blocks/utils/GenFieldName';
 export { FieldNameField, useFieldName, resolveFieldConfig } from './builder/common/FieldNameField';
@@ -146,6 +170,14 @@ export {
   getBlockFieldErrors,
 } from './utils/blockFields';
 export type { MappedField, BlockFieldMatch } from './utils/blockFields';
+export {
+  findDuplicateFieldNames,
+  assertUniqueFieldNames,
+  getFieldNameUses,
+  describeFieldNameUse,
+  DuplicateFieldNameError,
+} from './utils/duplicateFieldNames';
+export type { FieldNameUse, DuplicateFieldName } from './utils/duplicateFieldNames';
 
 // Block lock state for a custom block's settings form
 export { useBlockLock } from './context/BlockLockContext';
@@ -167,6 +199,7 @@ export type {
   BlockLockAccess,
   BlockData,
   BlockRendererProps,
+  AnswerViewProps,
   ContentBlockItemProps,
   OutputSchema,
   OutputSchemaScalar,

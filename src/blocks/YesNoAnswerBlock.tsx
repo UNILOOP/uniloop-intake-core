@@ -7,6 +7,9 @@ import type {
   ContentBlockItemProps,
   ThemeDefinition,
 } from '../types';
+import type { AnswerViewProps } from '../types';
+import { AnswerText } from '../renderer/answers/AnswerText';
+import { OptionChips } from '../renderer/answers/OptionChips';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
@@ -538,6 +541,24 @@ const createDefaultData = (fieldName: string): BlockData => ({
   showContinueButton: false,
 });
 
+// The saved answer is { answer, details }; a plain "Yes" or "No" is read too
+const YesNoAnswerView = ({ block, value }: AnswerViewProps) => {
+  const answer = typeof value === 'string' ? value : value?.answer;
+  const details = typeof value === 'object' && typeof value?.details === 'string' ? value.details.trim() : '';
+  return (
+    <div className="space-y-2">
+      <OptionChips
+        options={[
+          { label: getNoLabel(block), value: NO },
+          { label: getYesLabel(block), value: YES },
+        ]}
+        value={answer}
+      />
+      {details && <AnswerText>{details}</AnswerText>}
+    </div>
+  );
+};
+
 export const YesNoAnswerBlock: BlockDefinition = {
   type: 'yesNoAnswer',
   name: 'Yes/No Answer',
@@ -568,6 +589,7 @@ export const YesNoAnswerBlock: BlockDefinition = {
     return null;
   },
   // Rules test the Yes/No answer; the free-text details stay out of them.
+  answerView: (props) => <YesNoAnswerView {...props} />,
   outputSchema: {
     type: 'object',
     properties: {

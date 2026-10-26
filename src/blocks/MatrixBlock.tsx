@@ -5,6 +5,9 @@ import type {
   ContentBlockItemProps,
   ThemeDefinition,
 } from '../types';
+import { AnswerGrid } from '../renderer/answers/AnswerGrid';
+import { toOptionChoices } from '../renderer/answers/OptionChips';
+import { RawAnswer } from '../renderer/answers/RawAnswer';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
@@ -1064,6 +1067,16 @@ export const MatrixBlock: BlockDefinition = {
     },
   },
   // Output schema - this block returns an object with question IDs mapped to selected values
+  answerView: ({ block, value }) =>
+    value && typeof value === 'object' && !Array.isArray(value) ? (
+      <AnswerGrid
+        rows={((block.questions as MatrixQuestion[] | undefined) ?? []).map((row) => ({ id: row.id, label: row.text }))}
+        columns={toOptionChoices(block.options)}
+        value={value}
+      />
+    ) : (
+      <RawAnswer value={value} />
+    ),
   outputSchema: {
     type: 'object',
     properties: {

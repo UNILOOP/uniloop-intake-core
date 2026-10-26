@@ -44,7 +44,7 @@ function applyBlockOverrides(
   if (!overrides) return blocks;
   let effectiveBlocks: Record<string, BlockDefinition> | null = null;
   for (const [systemType, overrideType] of Object.entries(overrides)) {
-    const system = Object.hasOwn(blocks, systemType) ? blocks[systemType] : undefined;
+    const system = Object.prototype.hasOwnProperty.call(blocks, systemType) ? blocks[systemType] : undefined;
     if (!system || typeof overrideType !== "string" || overrideType === systemType) continue;
     const override = findBlockOverride(systemType, overrideType, system, blocks);
     if (!override) continue;

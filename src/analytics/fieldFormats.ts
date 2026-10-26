@@ -43,7 +43,8 @@ export interface FieldValueTypeDescriptor {
  * each type is the default the editor picks when the type is chosen. Format
  * ids must match AnalyticsFieldValueType::formats() on the backend. Hashing
  * is intentionally not a format: a field-map entry opts into SHA-256 with its
- * independent `hash` flag after all selected formats have run.
+ * independent `hash` flag after all selected formats have run. Every format
+ * is available to every channel; legacy `meta_*` ids remain stable for saved mappings.
  */
 export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
     {
@@ -63,7 +64,7 @@ export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
             { id: 'iso', label: 'ISO 8601', example: '2024-01-05' },
             { id: 'us', label: 'US', example: '01/05/2024' },
             { id: 'eu', label: 'Day first', example: '05/01/2024' },
-            { id: 'meta_dob', label: 'Meta date of birth', example: '2/16/1997 → 19970216' },
+            { id: 'meta_dob', label: 'Date of birth (YYYYMMDD)', example: '2/16/1997 → 19970216' },
             { id: 'unix', label: 'Unix seconds', example: '1704412800' },
             { id: 'unix_ms', label: 'Unix milliseconds', example: '1704412800000' },
         ],
@@ -114,10 +115,10 @@ export const FIELD_VALUE_TYPE_CATALOG: readonly FieldValueTypeDescriptor[] = [
             { id: 'trim', label: 'Trimmed', example: 'Jane' },
             { id: 'lowercase', label: 'Lowercase', example: 'jane' },
             { id: 'uppercase', label: 'Uppercase', example: 'JANE' },
-            { id: 'meta_gender', label: 'Meta gender', example: 'Female → f' },
-            { id: 'meta_city', label: 'Meta city', example: 'New York → newyork' },
-            { id: 'meta_state', label: 'Meta state', example: 'California → ca' },
-            { id: 'meta_postal_code', label: 'Meta ZIP / postal', example: '94035-1234 → 94035' },
+            { id: 'meta_gender', label: 'Gender (f / m)', example: 'Female → f' },
+            { id: 'meta_city', label: 'City (compact lowercase)', example: 'New York → newyork' },
+            { id: 'meta_state', label: 'State (US code / compact)', example: 'California → ca' },
+            { id: 'meta_postal_code', label: 'ZIP / postal (compact)', example: '94035-1234 → 94035' },
         ],
     },
     {
@@ -159,6 +160,9 @@ export const FIELD_MAP_LEVEL_NESTED: FieldMapLevel = 1;
  */
 export interface FieldMapEntry {
     to: string;
+    /** Ordered canonical inputs; join before applying formats and hashing. */
+    sources?: string[];
+    separator?: string | null;
     level?: FieldMapLevel;
     type?: FieldValueType;
     /** Ordered formatting pipeline. Each output becomes the next format's input. */
@@ -173,6 +177,8 @@ export type FieldMapValue = string | FieldMapEntry;
 
 export interface NormalizedFieldMapEntry {
     to: string;
+    sources?: string[];
+    separator?: string;
     level: FieldMapLevel;
     type: FieldValueType | null;
     formats: string[];
@@ -216,6 +222,10 @@ export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | 
     const to = raw.to;
     if (typeof to !== 'string' || !isValidOutputPath(to)) return null;
 
+    if ('sources' in raw && !isValidFieldSources(raw.sources)) return null;
+    if (raw.separator != null && typeof raw.separator !== 'string') return null;
+    if ('separator' in raw && !('sources' in raw)) return null;
+
     const level: FieldMapLevel = raw.level === 0 || raw.level === '0' ? FIELD_MAP_LEVEL_ROOT : FIELD_MAP_LEVEL_NESTED;
     const type = isFieldValueType(raw.type) ? raw.type : null;
     const legacyHash = raw.format === 'hashed';
@@ -234,7 +244,15 @@ export function normalizeFieldMapEntry(raw: unknown): NormalizedFieldMapEntry | 
         type: formats.length > 0 || legacyHash ? type : null,
         formats,
         hash: raw.hash === true || legacyHash,
+        ...(Array.isArray(raw.sources) ? { sources: [...raw.sources] as string[], separator: (raw.separator ?? '') as string } : {}),
     };
+}
+
+/** Shared by the importer and runtime; malformed derived entries never fall back to a different source. */
+export function isValidFieldSources(value: unknown): value is string[] {
+    return Array.isArray(value) && value.length > 0 && value.length <= 20
+        && value.every((source) => typeof source === 'string' && [...source].length <= 100 && isValidOutputPath(source))
+        && new Set(value).size === value.length;
 }
 
 /**
@@ -256,10 +274,14 @@ export function normalizeFieldMap(fieldMap: Record<string, unknown> | undefined 
  * legacy string when it is a plain rename, the object otherwise.
  */
 export function serializeFieldMapEntry(entry: NormalizedFieldMapEntry): FieldMapValue {
-    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.formats.length === 0 && !entry.hash) {
+    if (entry.level === FIELD_MAP_LEVEL_NESTED && entry.formats.length === 0 && !entry.hash && !entry.sources) {
         return entry.to;
     }
     const out: FieldMapEntry = { to: entry.to };
+    if (entry.sources) {
+        out.sources = [...entry.sources];
+        out.separator = entry.separator ?? '';
+    }
     if (entry.level === FIELD_MAP_LEVEL_ROOT) out.level = FIELD_MAP_LEVEL_ROOT;
     if (entry.type !== null && entry.formats.length > 0) {
         out.type = entry.type;

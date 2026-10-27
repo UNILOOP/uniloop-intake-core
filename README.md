@@ -239,6 +239,16 @@ The builder supports multiple display modes: `list`, `graph`, `flow`, `lang`, an
 
 To show one of your registered blocks in place of a built-in block, pass `blockOverrides` to both `SurveyBuilder` and `SurveyForm`. See [Overriding a System Block](#overriding-a-system-block).
 
+### Showing Saved Answers
+
+```tsx
+import { SurveyAnswerRenderer } from 'survey-form-package/src';
+
+<SurveyAnswerRenderer form={surveyData} answers={responses} />
+```
+
+Each answer is shown by its block's `answerView`, registered blocks included. See [Showing Saved Answers](./CUSTOM_BLOCKS_GUIDE.md#showing-saved-answers) in the custom blocks guide.
+
 ## Layouts
 
 The `layout` prop accepts a layout name string or a custom `React.FC<LayoutProps>` component.

@@ -21,6 +21,7 @@ import { getRuleOutputKeys, isObjectOutput } from "../utils/outputSchema";
 import { withMappedFieldMetadata } from "../utils/blockFields";
 import { getMappedFields } from "../utils/blockFields";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
+import type { ExternalField } from "../external";
 
 // Custom hook
 export const useSurveyBuilder = () => {
@@ -412,6 +413,11 @@ interface SurveyBuilderContextType {
   getAvailableFieldsBefore: (currentBlockId: string) => string[];
   getAvailableFieldsUptoCurrent: (currentBlockId: string) => string[];
   getAvailableFieldsExcludingCurrent: (currentBlockId: string) => string[];
+  /** External fields passed to the builder; their keys follow block fields in the lists above */
+  externalFields: ExternalField[];
+  getExternalField: (key: string) => ExternalField | undefined;
+  /** The keys a block saves: its field name, object output keys, and mapped keys */
+  getBlockFieldNames: (block: BlockData) => string[];
 }
 
 export const SurveyBuilderContext = createContext<SurveyBuilderContextType | undefined>(
@@ -439,7 +445,11 @@ interface SurveyBuilderProviderProps {
    * @default 'pageless'
    */
   mode?: SurveyMode;
+  /** Keys kept outside the form that rule editors offer next to block fields */
+  externalFields?: ExternalField[];
 }
+
+const NO_EXTERNAL_FIELDS: ExternalField[] = [];
 
 export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   children,
@@ -449,6 +459,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   hideBlockLockControls = false,
   blockOverrides,
   mode = 'pageless',
+  externalFields = NO_EXTERNAL_FIELDS,
 }) => {
   const [state, dispatch] = useReducer(
     surveyBuilderReducer,
@@ -478,6 +489,17 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
         : { ...state, definitions: { ...state.definitions, blocks: effectiveBlocks } },
     [state, stateBlocks, effectiveBlocks]
   );
+
+  const externalFieldsByKey = useMemo(
+    () => new Map(externalFields.filter(field => field?.key).map(field => [field.key, field])),
+    [externalFields]
+  );
+  // External keys come after block fields; a block field with the same name wins
+  const withExternalKeys = (names: string[]): string[] => {
+    if (externalFieldsByKey.size === 0) return names;
+    const seen = new Set(names);
+    return [...names, ...[...externalFieldsByKey.keys()].filter(key => !seen.has(key))];
+  };
 
   // Helper functions
   const addBlockDefinition = (type: string, definition: BlockDefinition) => {
@@ -746,7 +768,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
       }
     }
 
-    return [...new Set(fieldNames)];
+    return withExternalKeys([...new Set(fieldNames)]);
   };
 
   // Get available fields from blocks that exist before the current block
@@ -791,7 +813,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     };
 
     traverse(state.rootNode);
-    return [...new Set(fieldNames)];
+    return withExternalKeys([...new Set(fieldNames)]);
   };
 
   // Get available fields up to and including the current block
@@ -836,7 +858,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     };
 
     traverse(state.rootNode);
-    return [...new Set(fieldNames)];
+    return withExternalKeys([...new Set(fieldNames)]);
   };
 
   // Get available fields excluding the current block (all fields in survey except current)
@@ -902,6 +924,9 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     getAvailableFieldsBefore,
     getAvailableFieldsUptoCurrent,
     getAvailableFieldsExcludingCurrent,
+    externalFields,
+    getExternalField: (key: string) => externalFieldsByKey.get(key),
+    getBlockFieldNames: getNodeFieldNames,
   };
 
   return (

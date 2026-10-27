@@ -332,6 +332,10 @@ export interface GlobalCustomField {
     data: BlockData;
     onUpdate: (data: BlockData) => void;
     value?: any;
+    /** The keys this block saves: its field name, object output keys, and mapped keys */
+    fieldNames?: string[];
+    /** External fields passed to the builder */
+    externalFields?: import('./external').ExternalField[];
   }>;
   defaultValue?: any;
   showLabel?: boolean;
@@ -488,6 +492,12 @@ export interface SurveyFormRendererProps {
    * `renderBlock`, or throws while rendering, the system block is shown.
    */
   blockOverrides?: BlockOverrides;
+  /**
+   * Values kept outside the form (e.g. a patient record). Rules can read them,
+   * blocks bound to them through `external.sync` stay in step both ways, and
+   * `external.store.setValues` updates a mounted form in place.
+   */
+  external?: import('./external').ExternalConfig;
 }
 
 

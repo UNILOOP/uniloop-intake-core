@@ -68,6 +68,8 @@ export { GlobalCustomFields } from './builder/common/GlobalCustomFields';
 export { ReferenceQuestionKeyField } from './examples/ReferenceQuestionKeyField';
 export { SimpleCustomField } from './examples/SimpleCustomField';
 
+export type { ExternalField } from './external';
+
 // Re-export types needed for building
 export type {
   NodeDefinition,

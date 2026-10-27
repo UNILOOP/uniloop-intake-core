@@ -66,7 +66,7 @@ function buildRule(state: RuleState): NavigationRule {
 }
 
 export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRuleIndex, hideRemoveButton }) => {
-  const { state, getAvailableFieldsUptoCurrent } = useSurveyBuilder();
+  const { state, getAvailableFieldsUptoCurrent, getExternalField } = useSurveyBuilder();
 
   // Initialize rules state early, before any conditional returns
   const [rules, setRules] = React.useState<RuleState[]>(() => {
@@ -163,14 +163,13 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
     }
 
     const dot = field.indexOf(".");
-    if (dot === -1) return [];
-
-    const parent = findBlockByFieldName(field.slice(0, dot));
+    const parent = dot === -1 ? null : findBlockByFieldName(field.slice(0, dot));
     const definition = parent ? state.definitions?.blocks?.[parent.type] : undefined;
-    if (!parent || !definition) return [];
+    if (parent && definition) return getOutputPropertyOptions(definition, parent, field.slice(dot + 1));
 
-    return getOutputPropertyOptions(definition, parent, field.slice(dot + 1));
-  }, [findBlockByFieldName, findMappedField, getBlockOptions, state.definitions?.blocks]);
+    // An external key lists the options it was passed with
+    return getExternalField(field)?.options ?? [];
+  }, [findBlockByFieldName, findMappedField, getBlockOptions, getExternalField, state.definitions?.blocks]);
 
   const findBlockPath = React.useCallback((node: any, targetUuid: string, currentPath: any[] = []): any[] | null => {
     if (!node) return null;

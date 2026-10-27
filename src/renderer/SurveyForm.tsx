@@ -59,6 +59,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   customData,
   blockOverrides,
   mode,
+  external,
 }) => {
   // Track render count to diagnose re-render issues
   const renderCountRef = React.useRef(0);
@@ -385,6 +386,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             customData={customData}
             blockOverrides={blockOverrides}
             mode={mode ?? survey.mode}
+            external={external}
           >
             <LayoutComponent {...layoutProps} />
           </SurveyFormProvider>

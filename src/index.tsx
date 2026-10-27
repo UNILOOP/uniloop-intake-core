@@ -19,6 +19,20 @@ export default SurveyForm;
 // Survey form context and hooks
 export { SurveyFormProvider, useSurveyForm } from './context/SurveyFormContext';
 
+// External values: keys kept outside the form that rules and blocks can use
+export { createExternalStore, useExternalStore, hasExternalValue } from './external';
+export type {
+  ExternalField,
+  ExternalStore,
+  ExternalValues,
+  ExternalBinding,
+  ExternalSyncAdapter,
+  ExternalSyncContext,
+  ExternalConfig,
+  ExternalChangeSource,
+  ExternalListener,
+} from './external';
+
 // UI components for rendering
 export { DebugInfo } from './components/ui/DebugInfo';
 export { ValidationSummary } from './components/ui/ValidationSummary';

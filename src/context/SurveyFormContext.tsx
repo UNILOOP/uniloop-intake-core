@@ -1,5 +1,5 @@
 // Enhanced SurveyFormContext with Fixed Browser Back Navigation
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import type { NodeData, BlockData } from "../types";
 import type {
@@ -30,6 +30,17 @@ import {
   getBlockFieldNames,
   getFieldValidationRules,
 } from "../utils/blockFields";
+import { isSameValue, toRuleContext, type ExternalConfig, type ExternalValues } from "../external";
+import {
+  applyExternalToInternal,
+  callAdapter,
+  collectBindings,
+  readInternalValue,
+} from "../external/sync";
+
+const NO_EXTERNAL_VALUES: ExternalValues = {};
+const noopSubscribe = () => () => {};
+const getNoExternalValues = () => NO_EXTERNAL_VALUES;
 
 // Navigation history entry - uses UUIDs for stable references across conditional navigation
 interface NavigationHistoryEntry {
@@ -49,6 +60,10 @@ interface EnhancedSurveyFormContextProps extends SurveyFormContextProps {
   isCurrentPageValid: boolean;
   analytics?: any;
   customData?: any;
+  /** Values kept outside the form; empty without `external` */
+  externalValues: ExternalValues;
+  /** Writes external values (no-op without `external`) */
+  setExternalValues: (patch: ExternalValues) => void;
 }
 
 // Create context with default values
@@ -90,6 +105,8 @@ export const SurveyFormContext = createContext<EnhancedSurveyFormContextProps>({
   isCurrentPageValid: false,
   analytics: undefined,
   customData: undefined,
+  externalValues: NO_EXTERNAL_VALUES,
+  setExternalValues: () => {},
 });
 
 // Props for the provider
@@ -126,6 +143,8 @@ interface SurveyFormProviderProps {
    * If not provided, auto-detects based on survey structure
    */
   mode?: SurveyMode;
+  /** Values kept outside the form, and how blocks are bound to them */
+  external?: ExternalConfig;
 }
 
 // Provider component
@@ -152,6 +171,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   customData,
   blockOverrides,
   mode,
+  external,
 }) => {
   // Debug log for resume functionality
   if(debug)
@@ -182,8 +202,20 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   // This is calculated only once during initial render inside useState initializer
   const isInitialRender = useRef(true);
 
+  const externalStore = external?.store;
+  const externalSyncRef = useRef(external?.sync);
+  externalSyncRef.current = external?.sync;
+  const externalOnChangeRef = useRef(external?.onChange);
+  externalOnChangeRef.current = external?.onChange;
+
   const [values, setValues] = useState<Record<string, any>>(() => {
-    const initial = expandSavedValues(pages.flat(), { ...defaultValues, ...(initialValues || {}) });
+    const blocks = pages.flat();
+    const saved = expandSavedValues(blocks, { ...defaultValues, ...(initialValues || {}) });
+    // Bound keys without an answer start from their external value, so a block
+    // filled from outside is already answered when the form first renders
+    const initial = externalStore && external?.sync
+      ? applyExternalToInternal(saved, externalStore.getSnapshot(), null, collectBindings(blocks, external.sync), external.sync, blocks)
+      : saved;
     if(debug) {
       console.log('[SurveyFormProvider] Initial state values:', initial);
       console.log('[SurveyFormProvider] Starting at page:', startPage);
@@ -292,6 +324,94 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const allBlocksRef = useRef<BlockData[]>([]);
   allBlocksRef.current = pages.flat();
 
+  // External values: read from the host's store, merged under form values for rules
+  const externalValues = useSyncExternalStore(
+    externalStore ? externalStore.subscribe : noopSubscribe,
+    externalStore ? externalStore.getSnapshot : getNoExternalValues,
+    externalStore ? externalStore.getSnapshot : getNoExternalValues
+  );
+  const externalRuleContext = useMemo(() => toRuleContext(externalValues), [externalValues]);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+
+  const externalBindings = useMemo(
+    () => collectBindings(allBlocksRef.current, external?.sync),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [surveyData.rootNode, surveyMode, external?.sync]
+  );
+  const externalBindingsRef = useRef(externalBindings);
+  externalBindingsRef.current = externalBindings;
+  // Internal keys last written from external values, so they aren't echoed back
+  const writtenFromExternalRef = useRef(new Map<string, unknown>());
+
+  const setExternalValues = useCallback((patch: ExternalValues) => {
+    externalStore?.setValues(patch, 'form');
+  }, [externalStore]);
+
+  // Host listener, plus external -> internal for bound keys whose external value changed
+  useEffect(() => {
+    if (!externalStore) return;
+    return externalStore.subscribe((nextExternal, changes, source) => {
+      externalOnChangeRef.current?.(nextExternal, changes, source);
+      const sync = externalSyncRef.current;
+      if (!sync) return;
+      setValues(prev => applyExternalToInternal(
+        prev,
+        nextExternal,
+        changes,
+        externalBindingsRef.current,
+        sync,
+        allBlocksRef.current,
+        writtenFromExternalRef.current
+      ));
+    });
+  }, [externalStore]);
+
+  // Internal -> external: bound keys whose answer changed (on mount, only where the external value is empty)
+  const syncedValuesRef = useRef<Record<string, any> | null>(null);
+  useEffect(() => {
+    const previous = syncedValuesRef.current;
+    syncedValuesRef.current = values;
+    const sync = externalSyncRef.current;
+    if (!externalStore || !sync) return;
+
+    const currentExternal = externalStore.getSnapshot();
+    // Keys that only hold what external values just wrote aren't written back
+    const written = writtenFromExternalRef.current;
+    const echoed = new Set(
+      [...written].filter(([key, value]) => isSameValue(readInternalValue(values, key), value)).map(([key]) => key)
+    );
+    written.clear();
+
+    const patch: ExternalValues = {};
+    for (const { binding, block } of externalBindingsRef.current) {
+      if (binding.direction === 'toInternal' || echoed.has(binding.internalKey)) continue;
+      const value = readInternalValue(values, binding.internalKey);
+      if (previous ? isSameValue(value, readInternalValue(previous, binding.internalKey)) : value === undefined) continue;
+      if (!previous && binding.externalKey in currentExternal && currentExternal[binding.externalKey] !== undefined) continue;
+
+      patch[binding.externalKey] = sync.toExternal
+        ? callAdapter('toExternal', () => sync.toExternal!(value, binding, block), value)
+        : value;
+    }
+    if (Object.keys(patch).length > 0) externalStore.setValues(patch, 'form');
+  }, [values, externalStore]);
+
+  // Whether the host wants this block passed over (reads refs, so stale closures stay correct)
+  const isBlockSkippedByExternal = useCallback((block?: BlockData | null): boolean => {
+    const sync = externalSyncRef.current;
+    if (!block || !sync?.shouldSkipBlock) return false;
+    const bindings = externalBindingsRef.current
+      .filter(item => item.block === block || (!!block.uuid && item.block.uuid === block.uuid))
+      .map(item => item.binding);
+    return callAdapter('shouldSkipBlock', () => !!sync.shouldSkipBlock!(block, {
+      values: valuesRef.current,
+      externalValues: externalStore?.getSnapshot() ?? NO_EXTERNAL_VALUES,
+      bindings,
+    }), false);
+  }, [externalStore]);
+  const navigationDirectionRef = useRef<'forward' | 'back'>('forward');
+
   // Update values when initialValues changes (for dynamic loading)
   useEffect(() => {
     if (initialValues && Object.keys(initialValues).length > 0) {
@@ -366,6 +486,9 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     const pageBlocks = pages[pageIndex] || [];
     const block = pageBlocks.find(b => b.uuid === blockUuid);
 
+    // A block the host skips going forward is stepped over going back too
+    if (isBlockSkippedByExternal(block)) return true;
+
     if (!block || block.type !== 'auth') return false;
 
     // Check if this is an auth block with skipIfLoggedIn enabled
@@ -378,7 +501,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     // return !!existingToken;
 
     return false; // Simplified for this example
-  }, [pages, getPageIndexByUuid]);
+  }, [pages, getPageIndexByUuid, isBlockSkippedByExternal]);
 
   // Helper function to find the previous non-skippable block
   const findPreviousNonSkippableBlock = useCallback((
@@ -402,8 +525,19 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       historyIndex--;
     }
 
+    // Every earlier step was filled from external values: go back to the nearest
+    // one so it can be edited, rather than leaving the form
+    const previous = currentNavigationHistory[currentNavigationHistory.length - 2];
+    const previousPageIndex = previous ? getPageIndexByUuid(previous.pageUuid) : -1;
+    const previousBlock = previous?.blockUuid
+      ? (pages[previousPageIndex] || []).find(block => block.uuid === previous.blockUuid)
+      : undefined;
+    if (previous?.blockUuid && isBlockSkippedByExternal(previousBlock)) {
+      return { pageIndex: previousPageIndex, blockIndex: getBlockIndexByUuid(previousPageIndex, previous.blockUuid) };
+    }
+
     return null; // No valid previous block found
-  }, [shouldSkipBlockOnBack, getPageIndexByUuid, getBlockIndexByUuid]);
+  }, [shouldSkipBlockOnBack, getPageIndexByUuid, getBlockIndexByUuid, pages, isBlockSkippedByExternal]);
 
   // Enhanced browser back/forward handling
   useEffect(() => {
@@ -422,6 +556,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       if (hasInternalHistory) {
         // Prevent the default browser back action
         event.preventDefault();
+        navigationDirectionRef.current = 'back';
         
         // Find the previous valid position
         const target = findPreviousNonSkippableBlock(currentNavHistory);
@@ -541,9 +676,9 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const getVisibleBlocks = useCallback((blocks: BlockData[]): BlockData[] => {
     return blocks.filter(block => {
       if (!block.visibleIf) return true;
-      return isBlockVisible(block, { ...values, ...computedValues });
+      return isBlockVisible(block, { ...externalRuleContext, ...values, ...computedValues });
     });
-  }, [values, computedValues]);
+  }, [externalRuleContext, values, computedValues]);
 
   // Find the longest path from start to submit/end using memoized DP (O(n))
   // Each block is computed once and cached — no exponential backtracking
@@ -638,14 +773,14 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
           targetField: fieldName,
           dependencies: config.dependencies
         },
-        { ...values, ...computedValues }
+        { ...externalRuleContext, ...values, ...computedValues }
       );
 
       newComputedValues[fieldName] = config.format ? config.format(result) : result;
     });
 
     setComputedValues(prev => ({ ...prev, ...newComputedValues }));
-  }, [values, computedValues, computedFields]);
+  }, [externalRuleContext, values, computedValues, computedFields]);
 
   useEffect(() => {
     updateComputedValues();
@@ -653,13 +788,14 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
   const evaluateConditionWithContext = useCallback((condition: string, contextData?: Record<string, any>) => {
     const contextValues = {
+      ...externalRuleContext,
       ...values,
       ...computedValues,
       ...(contextData || {})
     };
 
     return evaluateCondition(condition, contextValues);
-  }, [values, computedValues]);
+  }, [externalRuleContext, values, computedValues]);
 
   const getNextPageIndex = useCallback((): number | null => {
     const currentPageBlocks = pages[currentPage] || [];
@@ -686,7 +822,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       const nextIndex = calculateNextPageIndex(
         currentPage,
         branchingLogic,
-        { ...values, ...computedValues },
+        { ...externalRuleContext, ...values, ...computedValues },
         totalPages
       );
 
@@ -701,14 +837,14 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       currentPageBlocks,
       pages,
       pageIds,
-      { ...values, ...computedValues }
+      { ...externalRuleContext, ...values, ...computedValues }
     );
     if (navIndex !== null) {
       return navIndex === -1 ? null : navIndex;
     }
 
     return currentPage + 1 < totalPages ? currentPage + 1 : null;
-  }, [currentPage, pages, totalPages, values, computedValues]);
+  }, [currentPage, pages, totalPages, externalRuleContext, values, computedValues]);
 
   const validateField = useCallback((
     fieldName: string,
@@ -717,7 +853,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   ): string | null => {
     // Validation context: prefer values supplied by the caller (they may not be
     // committed to state yet, e.g. during auto-continue) over the render snapshot.
-    const validationContext = { ...(formValues ?? values), ...computedValues };
+    const validationContext = { ...externalRuleContext, ...(formValues ?? values), ...computedValues };
 
     // First check for block-level validation using validateValue method.
     // Prefer the block currently being answered so a duplicate field name on
@@ -784,7 +920,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     }
 
     return null;
-  }, [customValidators, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext, blockOverrides]);
+  }, [customValidators, externalRuleContext, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext, blockOverrides]);
 
   // Calculate if the current page is valid
   const currentPageBlocks = pages[currentPage] || [];
@@ -874,6 +1010,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   // Enhanced navigation functions
   const goToPage = (pageIndex: number) => {
     if (pageIndex >= 0 && pageIndex < totalPages) {
+      navigationDirectionRef.current = 'forward';
       addToNavigationHistory(pageIndex, 0, 'jump');
       setCurrentPage(pageIndex);
       setCurrentBlockIndex(0);
@@ -885,6 +1022,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   };
 
   const goToNextBlock = (fValue?: Record<string, any>) => {
+    navigationDirectionRef.current = 'forward';
     const pageBlocks = pages[currentPage] || [];
     const currentBlock = pageBlocks[currentBlockIndex];
 
@@ -931,7 +1069,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       currentBlock,
       pages,
       pageIds,
-      { ...mergedValues, ...computedValues }
+      { ...externalRuleContext, ...mergedValues, ...computedValues }
     );
 
     if (target === 'submit') {
@@ -969,6 +1107,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
   // Enhanced goToPreviousBlock that works with browser back button
   const goToPreviousBlock = () => {
+    navigationDirectionRef.current = 'back';
     if (navigationHistory.length <= 1) {
       // Allow browser to handle the back navigation (exit app)
       window.history.back();
@@ -1047,6 +1186,22 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     setIsSubmitting(false);
   };
 
+  // Moving forward onto a block the host skips continues past it, once per arrival.
+  // Checking only on arrival lets the user edit a bound field without being moved on.
+  const skipCheckedArrivalRef = useRef<string | null>(null);
+  const arrivalBlock = (pages[currentPage] || [])[currentBlockIndex];
+  const arrivalKey = `${navigationHistory.length}:${currentPage}:${arrivalBlock?.uuid ?? currentBlockIndex}`;
+  useEffect(() => {
+    if (skipCheckedArrivalRef.current === arrivalKey) return;
+    skipCheckedArrivalRef.current = arrivalKey;
+    if (navigationDirectionRef.current === 'back' || isSubmitting) return;
+    if (isBlockSkippedByExternal(arrivalBlock)) {
+      if (enableDebug) console.log('[SurveyFormContext] Skipping block filled from external values:', arrivalBlock?.uuid);
+      goToNextBlock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrivalKey]);
+
   // Merge regular errors with conditional errors for display
   const mergedErrors = { ...errors, ...conditionalErrors };
 
@@ -1092,7 +1247,9 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         abTestPreviewMode,
         analytics,
         customData,
-        blockOverrides
+        blockOverrides,
+        externalValues,
+        setExternalValues,
       }}
     >
       {children}

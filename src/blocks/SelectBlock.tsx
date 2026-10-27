@@ -6,6 +6,7 @@ import {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import { OptionChips, toOptionChoices } from '../renderer/answers/OptionChips';
 import { Check } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -712,6 +713,7 @@ export const SelectBlock: BlockDefinition = {
       value: { type: 'string', description: 'Selected Option' },
     },
   },
+  answerView: ({ block, value }) => <OptionChips options={toOptionChoices(block.options)} value={value} />,
   outputSchema: {
     type: 'string',
   },

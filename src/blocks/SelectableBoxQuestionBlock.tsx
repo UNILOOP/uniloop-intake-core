@@ -6,6 +6,7 @@ import type {
   ThemeDefinition,
   ChatRendererProps,
 } from '../types';
+import { OptionChips, toOptionChoices } from '../renderer/answers/OptionChips';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
@@ -1258,6 +1259,7 @@ export const SelectableBoxQuestionBlock: BlockDefinition = {
   // Output schema - Union type based on multiSelect configuration
   // - Single select mode (multiSelect: false): returns string (e.g., "option-1")
   // - Multi-select mode (multiSelect: true): returns array (e.g., ["option-1", "option-2"])
+  answerView: ({ block, value }) => <OptionChips options={toOptionChoices(block.options)} value={value} />,
   outputSchema: {
     oneOf: [
       { type: 'string' }, // index 0: single select

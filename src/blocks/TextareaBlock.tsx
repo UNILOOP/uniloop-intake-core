@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import type { BlockDefinition, ContentBlockItemProps, BlockRendererProps } from "../types";
+import { AnswerText } from "../renderer/answers/AnswerText";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
@@ -229,6 +230,7 @@ export const TextareaBlock: BlockDefinition = {
     return null;
   },
   // Output schema - this block returns multi-line text as a string
+  answerView: ({ value }) => <AnswerText>{String(value)}</AnswerText>,
   outputSchema: {
     type: 'string'
   },

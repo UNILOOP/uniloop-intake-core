@@ -1,9 +1,9 @@
 import React from "react";
-import { useBlockLock } from "../../context/BlockLockContext";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import type { BlockData, BlockDefinition, FieldNameConfig, NodeData } from "../../types";
 import { sanitizeFieldName } from "../../blocks/utils/GenFieldName";
+import { useBlockLock } from "../../context/BlockLockContext";
 import { SurveyBuilderContext } from "../../context/SurveyBuilderContext";
 import { describeFieldNameUse, getFieldNameUses } from "../../utils/duplicateFieldNames";
 
@@ -116,7 +116,7 @@ const findOtherUses = (rootNode: NodeData | null | undefined, data: BlockData, n
   return others.map((use) =>
     use.block === data || (!!data.uuid && use.block.uuid === data.uuid)
       ? "this block's output fields"
-      : `"${describeFieldNameUse(use, name)}"`,
+      : `"${describeFieldNameUse(use)}"`,
   );
 };
 
@@ -124,6 +124,7 @@ export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, 
   const resolved = config ?? DEFAULT_FIELD_CONFIG;
   const field = useFieldName({ data, onUpdate });
   const { isLocked } = useBlockLock();
+  const locked = isLocked("fieldName");
   // Outside the builder there is no form to check against
   const rootNode = React.useContext(SurveyBuilderContext)?.state.rootNode;
   const takenBy = findOtherUses(rootNode, data, sanitizeFieldName(field.value));
@@ -139,14 +140,16 @@ export const FieldNameField: React.FC<FieldNameFieldProps> = ({ data, onUpdate, 
         onChange={field.onChange}
         onBlur={field.onBlur}
         placeholder={resolved.placeholder}
+        disabled={locked}
         aria-invalid={takenBy ? true : undefined}
-        disabled={isLocked("fieldName")}
       />
       {takenBy ? (
         <p className="text-xs text-destructive">
           Already used by {takenBy.slice(0, 3).join(", ")}
-          {takenBy.length > 3 ? ` and ${takenBy.length - 3} more` : ""}. Pick a unique name so the answers don't
-          overwrite each other.
+          {takenBy.length > 3 ? ` and ${takenBy.length - 3} more` : ""}.{" "}
+          {locked
+            ? "This field name is locked, so give the other one a unique name instead."
+            : "Pick a unique name so the answers don't overwrite each other."}
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">{resolved.description}</p>

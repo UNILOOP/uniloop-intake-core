@@ -334,10 +334,10 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const valuesRef = useRef(values);
   valuesRef.current = values;
 
+  const externalSync = external?.sync;
   const externalBindings = useMemo(
-    () => collectBindings(allBlocksRef.current, external?.sync),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [surveyData.rootNode, surveyMode, external?.sync]
+    () => collectBindings(getSurveyPages(surveyData.rootNode, surveyMode).flat(), externalSync),
+    [surveyData.rootNode, surveyMode, externalSync]
   );
   const externalBindingsRef = useRef(externalBindings);
   externalBindingsRef.current = externalBindings;
@@ -1191,15 +1191,19 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const skipCheckedArrivalRef = useRef<string | null>(null);
   const arrivalBlock = (pages[currentPage] || [])[currentBlockIndex];
   const arrivalKey = `${navigationHistory.length}:${currentPage}:${arrivalBlock?.uuid ?? currentBlockIndex}`;
-  useEffect(() => {
-    if (skipCheckedArrivalRef.current === arrivalKey) return;
-    skipCheckedArrivalRef.current = arrivalKey;
+  // Reads this render's state; the effect below runs it only when the arrival changes
+  const handleArrivalRef = useRef<(key: string) => void>(() => {});
+  handleArrivalRef.current = (key: string) => {
+    if (skipCheckedArrivalRef.current === key) return;
+    skipCheckedArrivalRef.current = key;
     if (navigationDirectionRef.current === 'back' || isSubmitting) return;
     if (isBlockSkippedByExternal(arrivalBlock)) {
       if (enableDebug) console.log('[SurveyFormContext] Skipping block filled from external values:', arrivalBlock?.uuid);
       goToNextBlock();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  };
+  useEffect(() => {
+    handleArrivalRef.current(arrivalKey);
   }, [arrivalKey]);
 
   // Merge regular errors with conditional errors for display

@@ -113,6 +113,9 @@ export interface AnalyticsConfig {
         debug?: boolean;
           eventMappings?: AnalyticsEventMappings;
     };
+    internalTrackEvent?: (event: SurveyAnalyticsEvent) => void;
+    internalTrackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;
+
     // Custom event handler function
     trackEvent?: (event: any) => void;
     trackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;

@@ -212,6 +212,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Track event across all providers
   const trackEvent = useCallback((event: SurveyAnalyticsEvent) => {
+    if (enabled) config.internalTrackEvent?.(event);
     if (!enabled || !eventAllowed(event.action)) return;
 
     // Call custom event handler if provided
@@ -241,6 +242,7 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
 
   // Track page view across all providers
   const trackPageView = useCallback((url: string, title?: string, additionalData?: Record<string, any>) => {
+    if (enabled) config.internalTrackPageView?.(url, title, additionalData);
     if (!enabled || !eventAllowed('page_view')) return;
 
     // Call custom event handler if provided
@@ -332,11 +334,11 @@ export const SurveyAnalyticsProvider: React.FC<SurveyAnalyticsProviderProps> = (
     trackPageView,
     trackTiming,
     setUserProperties,
-    isEnabled: enabled && (consentAllows('analytics')
+    isEnabled: enabled && (Boolean(config.internalTrackEvent || config.internalTrackPageView) || ((consentAllows('analytics')
       || Object.keys(config.eventMappings?.events ?? {}).some(eventAllowed)
       || Object.keys(config.eventMappings?.collection_consent ?? {}).some(eventAllowed)
       || (config.eventMappings?.independent_server_events?.length ?? 0) > 0)
-      && (isInitialized || Boolean(config.trackEvent || config.trackPageView)),
+      && (isInitialized || Boolean(config.trackEvent || config.trackPageView)))),
     config
   };
 

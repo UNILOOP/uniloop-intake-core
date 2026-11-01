@@ -8,6 +8,7 @@ import { ChevronLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getSurveyPages, detectSurveyMode } from '../../utils/surveyUtils';
 import { AnalyticsTrackedLayout } from './AnalyticsTrackedLayout';
+import { CurrentBlock } from './helpers/CurrentBlock';
 
 interface RenderPageSurveyLayoutProps {
   progressBar?:
@@ -108,6 +109,10 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
     getActualProgress,
     getVisibleBlocks,
     analytics,
+    pages: contextPages,
+    isPageStep,
+    currentPageNode,
+    currentStepBlocks,
   } = useSurveyForm();
 
   // Theme-driven styling (fallbacks keep MedVi defaults)
@@ -130,8 +135,7 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   // Detect survey mode and get the current page blocks from the surveyData in context
-  const surveyMode = detectSurveyMode(surveyData.rootNode);
-  const pages = getSurveyPages(surveyData.rootNode, surveyMode);
+  const pages = contextPages ?? getSurveyPages(surveyData.rootNode, detectSurveyMode(surveyData.rootNode));
   const currentPageBlocks =
     currentPage < pages.length ? pages[currentPage] : [];
   const visibleCurrentPageBlocks = getVisibleBlocks(currentPageBlocks);
@@ -167,7 +171,8 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
     if (canGoBack) goToPreviousBlock();
   };
 
-  const currentBlock = currentPageBlocks[currentBlockIndex];
+  // A page's own settings decide its buttons
+  const currentBlock = isPageStep ? currentPageNode : currentPageBlocks[currentBlockIndex];
   const blockDisclaimer = currentBlock?.disclaimer;
 
   const continueText = navigationButtons?.nextText || 'Continue';
@@ -176,11 +181,12 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   const hasExplicitNavigation = (currentBlock?.nextBlockId && currentBlock.nextBlockId !== 'submit')
     || (currentBlock?.navigationRules && currentBlock.navigationRules.length > 0);
   const isFinalStep = currentBlock?.isEndBlock ||
-    (isLastPage && currentBlockIndex === currentPageBlocks.length - 1 && !hasExplicitNavigation);
+    (isPageStep && (currentStepBlocks ?? []).some(block => block.isEndBlock)) ||
+    (isLastPage && (isPageStep || currentBlockIndex === currentPageBlocks.length - 1) && !hasExplicitNavigation);
 
   const showNextButton =
     navigationButtons?.showNext !== false &&
-    currentPageBlocks[currentBlockIndex]?.showContinueButton !== false;
+    currentBlock?.showContinueButton !== false;
 
   // Debug info (only shown when enableDebug is true)
   const debugInfo = enableDebug
@@ -303,6 +309,9 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
+              {isPageStep ? (
+                <CurrentBlock className="space-y-4" />
+              ) : (
               <div className="space-y-4">
                 {currentPageBlocks[currentBlockIndex] && (
                   <BlockRenderer
@@ -340,6 +349,7 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
                   />
                 )}
               </div>
+              )}
             </MotionFragment>
           </AnimatePresence>
         )}

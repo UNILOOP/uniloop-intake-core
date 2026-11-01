@@ -7,8 +7,9 @@ import type {
   CurrentValues,
   EvaluationResult,
 } from '../types';
-import type { BlockData, BlockDefinition } from '../types';
+import type { BlockData, BlockDefinition, BlockVisibility } from '../types';
 import { getOutputPropertyOptions, getRuleOutputKeys } from './outputSchema';
+import { splitConditions } from './conditionGroups';
 
 /**
  * Evaluates a simple condition between two values using the specified operator
@@ -161,39 +162,13 @@ export function evaluateConditionRule(
 }
 
 function evaluateNavigationalRule(conditionalRule: NavigationRule, currentValues: CurrentValues): EvaluationResult {
+  const { target, isPage } = conditionalRule;
   try {
-    const { condition, target, isPage } = conditionalRule;
-    
-    
-    // Try to parse enhanced operators first
-    const enhancedResult = evaluateEnhancedCondition(condition, currentValues);
-    if (enhancedResult !== null) {
-      return {
-        matched: enhancedResult,
-        target: enhancedResult ? target : null,
-        isPage: enhancedResult ? (isPage ? true : false) : null
-      };
-    }
-    
-    // Fallback to Function constructor evaluation for complex conditions
-    const context = { ...currentValues };
-    const evaluator = new Function(...Object.keys(context), `return ${condition}`);
-    const result = evaluator(...Object.values(context));
-    
-    if (result) {
-      return {
-        matched: true,
-        target: target,
-        isPage: isPage ? true : false
-      };
-    }
-    
-    return {
-      matched: false,
-      target: null,
-      isPage: null
-    };
-    
+    const matched = splitConditions(conditionalRule.condition)
+      .every(condition => evaluateSingleRuleCondition(condition, currentValues));
+    return matched
+      ? { matched: true, target, isPage: !!isPage }
+      : { matched: false, target: null, isPage: null };
   } catch (error) {
     console.error('Error evaluating condition:', error);
     return {
@@ -203,6 +178,26 @@ function evaluateNavigationalRule(conditionalRule: NavigationRule, currentValues
       error: error
     };
   }
+}
+
+/** One condition written by the rule editor, or a plain expression */
+function evaluateSingleRuleCondition(condition: string, currentValues: CurrentValues): boolean {
+  // Try to parse enhanced operators first
+  const enhancedResult = evaluateEnhancedCondition(condition, currentValues);
+  if (enhancedResult !== null) return !!enhancedResult;
+
+  // Fallback to Function constructor evaluation for complex conditions
+  const context = { ...currentValues };
+  const evaluator = new Function(...Object.keys(context), `return ${condition}`);
+  return !!evaluator(...Object.values(context));
+}
+
+/**
+ * Whether a rule condition matches, as navigation rules evaluate it. Conditions
+ * joined by `joinConditions` all have to match.
+ */
+export function evaluateRuleCondition(condition: string, currentValues: CurrentValues): boolean {
+  return evaluateNavigationalRule({ condition, target: '' }, currentValues).matched;
 }
 
 // Helper to get value from currentValues supporting nested paths (e.g., "user.email")
@@ -752,8 +747,19 @@ export function findBlockPosition(
   return null;
 }
 
+/** Position of a block, or of a page (a step) when the target is a page's UUID */
+export function findStepPosition(
+  pages: Array<BlockData[]>,
+  pageIds: string[],
+  target: string
+): { pageIndex: number; blockIndex: number } | null {
+  const pageIndex = pageIds.indexOf(target);
+  if (pageIndex >= 0) return { pageIndex, blockIndex: 0 };
+  return findBlockPosition(pages, target);
+}
+
 /**
- * Evaluate navigation rules on a single block and return the target position
+ * Evaluate navigation rules on a single block (or a page) and return the target position
  */
 export function getNextStepFromNavigationRules(
   block: BlockData,
@@ -774,7 +780,7 @@ export function getNextStepFromNavigationRules(
         const idx = pageIds.indexOf(String(evaluate.target));
         if (idx >= 0) return { pageIndex: idx, blockIndex: 0 };
       } else {
-        const pos = findBlockPosition(pages, String(evaluate.target));
+        const pos = findStepPosition(pages, pageIds, String(evaluate.target));
         if (pos) return pos;
       }
     }
@@ -797,7 +803,7 @@ export function getNextStepFromNavigationRules(
     if (block.nextBlockId === 'submit') {
       return 'submit';
     }
-    const pos = findBlockPosition(pages, block.nextBlockId);
+    const pos = findStepPosition(pages, pageIds, block.nextBlockId);
     if (pos) return pos;
   }
 
@@ -853,16 +859,22 @@ export function executeCalculation(
  * Evaluates if a block should be visible based on its visibility condition
  */
 export function isBlockVisible(
-  block: { visibleIf?: string | ConditionRule | ConditionRule[] },
+  block: { visibleIf?: string | ConditionRule | ConditionRule[]; visibility?: BlockVisibility },
   fieldValues: Record<string, any>
 ): boolean {
-  // If no visibility condition, the block is always visible
-  if (!block.visibleIf) {
+  if (block.visibleIf && !evaluateCondition(block.visibleIf, fieldValues)) {
+    return false;
+  }
+
+  const { visibility } = block;
+  const conditions = (visibility?.conditions ?? []).filter(condition => condition?.trim());
+  if (!visibility || conditions.length === 0) {
     return true;
   }
 
-  // Evaluate the visibility condition
-  return evaluateCondition(block.visibleIf, fieldValues);
+  const test = (condition: string) => evaluateRuleCondition(condition, fieldValues);
+  const matched = visibility.match === 'any' ? conditions.some(test) : conditions.every(test);
+  return visibility.initial === 'hidden' ? matched : !matched;
 }
 
 /**

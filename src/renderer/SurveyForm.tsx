@@ -390,6 +390,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             blockOverrides={blockOverrides}
             mode={mode ?? survey.mode}
             external={external}
+            flattenPages={layout === 'chat' || layout === 'voice'}
           >
             <LayoutComponent {...layoutProps} />
           </SurveyFormProvider>

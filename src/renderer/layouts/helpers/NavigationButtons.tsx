@@ -116,13 +116,17 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
     isValid,
     canGoBack,
     surveyData,
+    pages: contextPages,
+    isPageStep,
+    currentPageNode,
+    currentStepBlocks,
   } = useSurveyForm();
 
   // Get the current page blocks to check for showContinueButton
-  const surveyMode = detectSurveyMode(surveyData.rootNode);
-  const pages = getSurveyPages(surveyData.rootNode, surveyMode);
+  const pages = contextPages ?? getSurveyPages(surveyData.rootNode, detectSurveyMode(surveyData.rootNode));
   const currentPageBlocks = currentPage < pages.length ? pages[currentPage] : [];
-  const currentBlock = currentPageBlocks[currentBlockIndex];
+  // A page's own settings decide its buttons
+  const currentBlock = isPageStep ? currentPageNode : currentPageBlocks[currentBlockIndex];
 
   // Check if we should show the next button based on block configuration
   const shouldShowNext = showNext && currentBlock?.showContinueButton !== false;
@@ -131,12 +135,14 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   const hasExplicitNavigation = (currentBlock?.nextBlockId && currentBlock.nextBlockId !== 'submit')
     || (currentBlock?.navigationRules && currentBlock.navigationRules.length > 0);
   const isFinalStep = currentBlock?.isEndBlock ||
-    (isLastPage && currentBlockIndex === currentPageBlocks.length - 1 && !hasExplicitNavigation);
+    (isPageStep && (currentStepBlocks ?? []).some(block => block.isEndBlock)) ||
+    (isLastPage && (isPageStep || currentBlockIndex === currentPageBlocks.length - 1) && !hasExplicitNavigation);
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isFinalStep) {
+    // A page checks all of its answers on the way out, also when it submits
+    if (isFinalStep && !isPageStep) {
       submit();
       onNavigate?.('submit');
     } else {

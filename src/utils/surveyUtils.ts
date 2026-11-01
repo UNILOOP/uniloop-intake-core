@@ -3,8 +3,8 @@ import { isDefaultLanguageCode } from "./languages";
 
 /**
  * Detects the survey mode based on the structure of rootNode
- * - If rootNode.items contains 'set' blocks, it's paged mode
- * - If rootNode.items contains non-set blocks directly, it's pageless mode
+ * - If every item of rootNode is a 'set' block, it's paged mode
+ * - Otherwise it's pageless mode, where sets next to single blocks are pages
  * @param rootNode The survey root node
  * @returns The detected survey mode
  */
@@ -13,11 +13,21 @@ export function detectSurveyMode(rootNode: NodeData): SurveyMode {
     return 'paged'; // Default to paged mode
   }
 
-  // Check if any item is a 'set' (page) block
-  const hasSetBlocks = rootNode.items.some(item => item.type === 'set');
+  return rootNode.items.every(item => item.type === 'set') ? 'paged' : 'pageless';
+}
 
-  // If we have set blocks, it's paged mode; otherwise it's pageless mode
-  return hasSetBlocks ? 'paged' : 'pageless';
+export interface SurveyPagesOptions {
+  /**
+   * Pageless mode only: keep each root 'set' as one step that shows all of its
+   * blocks (a page), instead of one step per block. Layouts that ask one question
+   * at a time (chat, voice) leave this off.
+   */
+  groupPages?: boolean;
+}
+
+/** Whether a root item is a page: a 'set' that holds blocks */
+export function isPageNode(item: BlockData | undefined): boolean {
+  return item?.type === 'set' && Array.isArray(item.items) && item.items.length > 0;
 }
 
 /**
@@ -29,7 +39,7 @@ export function detectSurveyMode(rootNode: NodeData): SurveyMode {
  * In paged mode: Returns array where each element is an array of blocks in a page (set)
  * In pageless mode: Returns array where each element is a single-block array (each block is its own "page")
  */
-export function getSurveyPages(rootNode: NodeData, mode?: SurveyMode): Array<BlockData[]> {
+export function getSurveyPages(rootNode: NodeData, mode?: SurveyMode, options: SurveyPagesOptions = {}): Array<BlockData[]> {
   const pages: Array<BlockData[]> = [];
 
   // If there are no nodes or items, return empty array
@@ -46,9 +56,12 @@ export function getSurveyPages(rootNode: NodeData, mode?: SurveyMode): Array<Blo
       // Pageless mode: each block is its own "page"
       // Handle case where data might have 'set' blocks from paged mode - flatten them
       rootNode.items.forEach(item => {
-        if (item.type === 'set' && item.items && item.items.length > 0) {
+        if (isPageNode(item) && options.groupPages) {
+          // A page: one step with every block of the set
+          pages.push(item.items!);
+        } else if (isPageNode(item)) {
           // Flatten set blocks: each block inside the set becomes its own page
-          item.items.forEach(block => {
+          item.items!.forEach(block => {
             pages.push([block]);
           });
         } else {
@@ -127,7 +140,7 @@ export function getSurveyPages(rootNode: NodeData, mode?: SurveyMode): Array<Blo
  * In paged mode: Returns UUIDs of set/page nodes
  * In pageless mode: Returns UUIDs of individual blocks (each block is its own "page")
  */
-export function getSurveyPageIds(rootNode: NodeData, mode?: SurveyMode): string[] {
+export function getSurveyPageIds(rootNode: NodeData, mode?: SurveyMode, options: SurveyPagesOptions = {}): string[] {
   const ids: string[] = [];
 
   // Use explicit mode if provided, otherwise auto-detect
@@ -139,9 +152,12 @@ export function getSurveyPageIds(rootNode: NodeData, mode?: SurveyMode): string[
         // Pageless mode: each block's UUID is a "page" ID
         // Handle case where data might have 'set' blocks from paged mode - flatten them
         node.items.forEach(item => {
-          if (item.type === 'set' && item.items && item.items.length > 0) {
+          if (isPageNode(item) && options.groupPages) {
+            // A page is one step, identified by the set's UUID
+            ids.push(item.uuid || '');
+          } else if (isPageNode(item)) {
             // Flatten set blocks: each block inside becomes its own "page"
-            item.items.forEach(block => {
+            item.items!.forEach(block => {
               ids.push(block.uuid || '');
             });
           } else {

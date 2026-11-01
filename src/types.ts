@@ -477,6 +477,9 @@ export interface SurveyFormRendererProps {
     trackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;
     trackTiming?: (category: string, variable: string, value: number, label?: string) => void;
     setUserProperties?: (properties: Record<string, any>) => void;
+    /** Host-side internal collection, independent of vendor providers and consent; optional. */
+    internalTrackEvent?: (event: any) => void;
+    internalTrackPageView?: (url: string, title?: string, additionalData?: Record<string, any>) => void;
     trackFieldInteractions?: boolean;
     trackValidationErrors?: boolean;
     trackTimings?: boolean;

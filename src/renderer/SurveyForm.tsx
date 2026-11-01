@@ -313,6 +313,9 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
       trackPageView: analytics.trackPageView,
       trackTiming: analytics.trackTiming,
       setUserProperties: analytics.setUserProperties,
+      // Optional host callbacks declared on AnalyticsConfig; the form behaves the same when they are absent.
+      internalTrackEvent: analytics.internalTrackEvent,
+      internalTrackPageView: analytics.internalTrackPageView,
     };
   }, [analytics]);
 

@@ -19,8 +19,9 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { GripVertical, Plus } from "lucide-react";
 import { ContentBlockItem } from "../blocks/ContentBlockItem";
+import { isPageItem, moveBlock, removePageKeepingBlocks } from "../helpers/pageItems";
 
-// Lazy load ContentBlockPage - only used in tabs for paged mode
+// Lazy load ContentBlockPage - only used for pages
 const ContentBlockPage = lazy(() => import("../blocks/ContentBlockPage").then(m => ({ default: m.ContentBlockPage })));
 
 interface SectionNodeProps {
@@ -176,6 +177,33 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
     });
   };
 
+  // === Pages among single blocks (pageless mode) ===
+  const isPage = isPageItem;
+
+  const handleAddHybridPage = () => {
+    const pageCount = (data.items || []).filter(isPage).length;
+    onUpdate({
+      ...data,
+      items: [
+        ...(data.items || []),
+        { type: "set", name: `Page ${pageCount + 1}`, uuid: uuidv4(), items: [] },
+      ],
+    });
+  };
+
+  const handleRemoveHybridPage = (index: number) => {
+    onUpdate({ ...data, items: removePageKeepingBlocks(data.items || [], index) });
+  };
+
+  const handleMoveBlock = (blockUuid: string, target: string) => {
+    onUpdate({ ...data, items: moveBlock(data.items || [], blockUuid, target) });
+  };
+
+  const pageMoveTargets = (exceptPageUuid?: string) =>
+    ((data.items || []) as BlockData[])
+      .filter((item) => isPage(item) && item.uuid !== exceptPageUuid)
+      .map((page) => ({ value: `page:${page.uuid}`, label: `Into ${page.name || "Page"}` }));
+
   // === Common handlers ===
   const handleAddChildSection = () => {
     if (data.uuid) {
@@ -227,6 +255,20 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
 
     return (
       <div className="w-56 flex-shrink-0 rounded-xl border-1 bg-muted/30 p-3 overflow-y-auto max-h-[70vh] sticky top-0">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddHybridPage}
+          className="justify-start w-full text-xs mb-1.5"
+        >
+          <Plus className="mr-1.5 h-3 w-3" />
+          <span className="truncate">Page</span>
+        </Button>
+        <p className="text-xs text-muted-foreground mb-3">
+          Several blocks on one screen
+        </p>
+
         <h4 className="text-sm font-semibold mb-3">Add Block</h4>
 
         {hasCustomBlocks ? (
@@ -336,13 +378,28 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
                     <SortableItemHandle className="absolute -left-5 top-2 cursor-grab text-muted-foreground">
                       <GripVertical className="h-4 w-4" />
                     </SortableItemHandle>
-                    <ContentBlockItem
-                      data={block}
-                      onUpdate={(updatedBlock) =>
-                        handleBlockUpdate(index, updatedBlock)
-                      }
-                      onRemove={() => handleBlockRemove(index)}
-                    />
+                    {isPage(block) ? (
+                      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading page...</div>}>
+                        <ContentBlockPage
+                          data={block}
+                          onUpdate={(updatedPage) => handleBlockUpdate(index, updatedPage)}
+                          onRemove={() => handleRemoveHybridPage(index)}
+                          hybrid
+                          moveTargets={[{ value: "root", label: "Out of page" }, ...pageMoveTargets(block.uuid)]}
+                          onMoveBlock={handleMoveBlock}
+                        />
+                      </Suspense>
+                    ) : (
+                      <ContentBlockItem
+                        data={block}
+                        onUpdate={(updatedBlock) =>
+                          handleBlockUpdate(index, updatedBlock)
+                        }
+                        onRemove={() => handleBlockRemove(index)}
+                        moveTargets={pageMoveTargets()}
+                        onMove={block.uuid ? (target) => handleMoveBlock(block.uuid as string, target) : undefined}
+                      />
+                    )}
                   </div>
                 </SortableItem>
                 {/* Drop zone after each block */}

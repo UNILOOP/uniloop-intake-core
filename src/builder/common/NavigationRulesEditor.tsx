@@ -13,11 +13,9 @@ import {
 } from "../../components/ui/select";
 import { useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import type { BlockData, NavigationRule } from "../../types";
-import { NavigationRuleValueInput } from "./NavigationRuleValueInput";
-import { getOutputPropertyOptions } from "../../utils/outputSchema";
-import { getMappedFields } from "../../utils/blockFields";
+import { ConditionFields, useRuleFieldOptions, type ConditionState } from "./ConditionFields";
+import { joinConditions, splitConditions } from "../../utils/conditionGroups";
 import {
-  OPERATORS,
   enhancedRuleToStandard,
   standardRuleToEnhanced,
   type EnhancedNavigationRule
@@ -40,24 +38,43 @@ interface Props {
   hideRemoveButton?: boolean;
 }
 
-interface RuleState extends EnhancedNavigationRule {
+interface AndConditionState extends ConditionState {
   id: string;
 }
 
-function parseRule(rule: NavigationRule & { id?: string }): RuleState {
-  const parsed = standardRuleToEnhanced(rule.condition);
+interface RuleState extends EnhancedNavigationRule {
+  id: string;
+  /** Conditions that also have to match, joined to the first one with `&&` */
+  and: AndConditionState[];
+}
+
+function parseCondition(condition: string): ConditionState {
+  const parsed = standardRuleToEnhanced(condition);
   return {
-    id: rule.id || uuidv4(),
     field: parsed.field || "",
     operator: parsed.operator || "==",
     value: parsed.value || "",
+  };
+}
+
+function parseRule(rule: NavigationRule & { id?: string }): RuleState {
+  const [first = "", ...rest] = splitConditions(rule.condition || "");
+  return {
+    id: rule.id || uuidv4(),
+    ...parseCondition(first),
+    and: rest.map((condition) => ({ id: uuidv4(), ...parseCondition(condition) })),
     target: String(rule.target),
     isPage: rule.isPage,
   };
 }
 
 function buildRule(state: RuleState): NavigationRule {
-  const condition = enhancedRuleToStandard(state);
+  const condition = joinConditions([
+    enhancedRuleToStandard(state),
+    ...state.and
+      .filter((condition) => condition.field)
+      .map((condition) => enhancedRuleToStandard({ ...condition, target: state.target })),
+  ]);
   return {
     condition,
     target: state.target,
@@ -66,110 +83,14 @@ function buildRule(state: RuleState): NavigationRule {
 }
 
 export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRuleIndex, hideRemoveButton }) => {
-  const { state, getAvailableFieldsUptoCurrent, getExternalField } = useSurveyBuilder();
+  const { state, getAvailableFieldsUptoCurrent } = useSurveyBuilder();
 
   // Initialize rules state early, before any conditional returns
   const [rules, setRules] = React.useState<RuleState[]>(() => {
     return (data.navigationRules || []).map(parseRule);
   });
 
-  // Helper function to find a block by field name
-  const findBlockByFieldName = React.useCallback((fieldName: string): BlockData | null => {
-    if (!state.rootNode || !fieldName) return null;
-
-    const traverse = (node: any): BlockData | null => {
-      // Check if this node matches
-      if (node.fieldName === fieldName) {
-        return node as BlockData;
-      }
-
-      // Check items array
-      if (Array.isArray(node.items)) {
-        for (const item of node.items) {
-          const result = traverse(item);
-          if (result) return result;
-        }
-      }
-
-      // Check nodes array
-      if (Array.isArray(node.nodes)) {
-        for (const childNode of node.nodes) {
-          if (typeof childNode !== "string") {
-            const result = traverse(childNode);
-            if (result) return result;
-          }
-        }
-      }
-
-      return null;
-    };
-
-    return traverse(state.rootNode);
-  }, [state.rootNode]);
-
-  // Helper function to find the block that saves an output key under this field name
-  const findMappedField = React.useCallback((fieldName: string): { block: BlockData; key: string } | null => {
-    if (!state.rootNode || !fieldName) return null;
-
-    const traverse = (node: BlockData): { block: BlockData; key: string } | null => {
-      const mapped = getMappedFields(node).find((field) => field.fieldName === fieldName);
-      if (mapped) return { block: node, key: mapped.key };
-
-      for (const child of [...(node.items || []), ...(node.nodes || [])]) {
-        if (typeof child === "string") continue;
-        const result = traverse(child);
-        if (result) return result;
-      }
-      return null;
-    };
-
-    return traverse(state.rootNode as BlockData);
-  }, [state.rootNode]);
-
-  // Helper function to extract options from a block
-  const getBlockOptions = React.useCallback((block: BlockData | null): Array<{ label: string; value: string }> => {
-    if (!block) return [];
-
-    // Check for options array (new format used by radio, select, checkbox blocks)
-    if (Array.isArray(block.options)) {
-      return block.options.map((opt: any) => ({
-        label: opt.label || opt.value || String(opt),
-        value: opt.value || opt.label || String(opt),
-      }));
-    }
-
-    // Check for labels/values arrays (legacy format)
-    if (Array.isArray(block.labels)) {
-      return block.labels.map((label: string, index: number) => ({
-        label,
-        value: Array.isArray(block.values) ? String(block.values[index]) : label,
-      }));
-    }
-
-    return [];
-  }, []);
-
-  // Options for a rule's field: the block's own options, or for `fieldName.<key>`
-  // the options its output schema lists for that key
-  const getFieldOptions = React.useCallback((field: string): Array<{ label: string; value: string }> => {
-    const block = findBlockByFieldName(field);
-    if (block) return getBlockOptions(block);
-
-    // A key a block saves under its own field name lists its output schema's options
-    const mapped = findMappedField(field);
-    if (mapped) {
-      const definition = state.definitions?.blocks?.[mapped.block.type];
-      return definition ? getOutputPropertyOptions(definition, mapped.block, mapped.key) : [];
-    }
-
-    const dot = field.indexOf(".");
-    const parent = dot === -1 ? null : findBlockByFieldName(field.slice(0, dot));
-    const definition = parent ? state.definitions?.blocks?.[parent.type] : undefined;
-    if (parent && definition) return getOutputPropertyOptions(definition, parent, field.slice(dot + 1));
-
-    // An external key lists the options it was passed with
-    return getExternalField(field)?.options ?? [];
-  }, [findBlockByFieldName, findMappedField, getBlockOptions, getExternalField, state.definitions?.blocks]);
+  const getFieldOptions = useRuleFieldOptions();
 
   const findBlockPath = React.useCallback((node: any, targetUuid: string, currentPath: any[] = []): any[] | null => {
     if (!node) return null;
@@ -467,9 +388,26 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
   const addRule = React.useCallback(() => {
     setRules((prev) => [
       ...prev,
-      { id: uuidv4(), field: "", operator: "==", value: "", target: "", isPage: true },
+      { id: uuidv4(), field: "", operator: "==", value: "", and: [], target: "", isPage: true },
     ]);
   }, []);
+
+  const updateAndConditions = React.useCallback((index: number, update: (and: AndConditionState[]) => AndConditionState[]) => {
+    setRules((prev) => {
+      const newRules = [...prev];
+      newRules[index] = { ...newRules[index], and: update(newRules[index].and) };
+      return newRules;
+    });
+  }, []);
+
+  const addAndCondition = (index: number) =>
+    updateAndConditions(index, (and) => [...and, { id: uuidv4(), field: "", operator: "==", value: "" }]);
+
+  const removeAndCondition = (index: number, andIndex: number) =>
+    updateAndConditions(index, (and) => and.filter((_, i) => i !== andIndex));
+
+  const handleAndConditionChange = (index: number, andIndex: number, key: keyof ConditionState, value: any) =>
+    updateAndConditions(index, (and) => and.map((condition, i) => (i === andIndex ? { ...condition, [key]: value } : condition)));
 
   const removeRule = React.useCallback((index: number) => {
     setRules((prev) => prev.filter((_, i) => i !== index));
@@ -479,7 +417,99 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
     setRules(newRules);
   }, []);
 
-  const renderRuleEditor = React.useCallback((rule: RuleState, index: number, isSortable: boolean = false) => {
+  const renderRuleBody = (rule: RuleState, index: number) => (
+    <>
+      <ConditionFields
+        condition={rule}
+        onChange={(key, value) => handleRuleChange(index, key, value)}
+        fieldOptions={fieldOptions}
+        getFieldOptions={getFieldOptions}
+        fieldType={data.type === 'number' ? 'number' : 'text'}
+      />
+      {rule.and.map((condition, andIndex) => (
+        <div key={condition.id} className="space-y-2 border-t pt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">And</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => removeAndCondition(index, andIndex)}
+            >
+              Remove
+            </Button>
+          </div>
+          <ConditionFields
+            condition={condition}
+            onChange={(key, value) => handleAndConditionChange(index, andIndex, key, value)}
+            fieldOptions={fieldOptions}
+            getFieldOptions={getFieldOptions}
+            fieldType={data.type === 'number' ? 'number' : 'text'}
+          />
+        </div>
+      ))}
+      <div>
+        <Button type="button" variant="outline" size="sm" onClick={() => addAndCondition(index)}>
+          <Plus className="h-3 w-3 mr-1" />
+          And
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-sm">Target</Label>
+          <Select
+            value={
+              rule.target === "submit"
+                ? "submit"
+                : rule.isPage
+                  ? `page:${rule.target}`
+                  : `block:${rule.target}`
+            }
+            onValueChange={(val) => handleTargetChange(index, val)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Choose" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Pages</SelectLabel>
+                {pageOptions.map((p) => (
+                  <SelectItem key={`page-${p.uuid}`} value={`page:${p.uuid}`} className="pl-4">
+                    <span className="text-sm">{p.name}</span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Blocks</SelectLabel>
+                {blockOptions.map((b) => (
+                  <SelectItem key={`block-${b.uuid}`} value={`block:${b.uuid}`} className="pl-4">
+                    <span className="text-sm">{b.name}</span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectItem value="submit" className="font-medium">
+                <span className="text-sm">Submit Form</span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {!hideRemoveButton && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => removeRule(index)}
+          >
+            Remove Rule
+          </Button>
+        </div>
+      )}
+    </>
+  );
+
+  const renderRuleEditor = (rule: RuleState, index: number, isSortable: boolean = false) => {
     if (isSortable) {
       return (
           <SortableItem key={rule.id} value={rule.id} className="border rounded-md p-3 space-y-3 my-2 bg-background">
@@ -489,342 +519,16 @@ export const NavigationRulesEditor: React.FC<Props> = ({ data, onUpdate, editRul
               </SortableItemHandle>
               <span className="text-xs font-medium text-muted-foreground">Rule {index + 1}</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-sm">Variable</Label>
-                <Select
-                  value={rule.field}
-                  onValueChange={(val) => handleRuleChange(index, "field", val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select field" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                    {fieldOptions.map((name) => (
-                      <SelectItem key={name} value={name} className="pl-2">
-                        <span className="text-sm">{name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">Operator</Label>
-                <Select
-                  value={rule.operator}
-                  onValueChange={(val) => handleRuleChange(index, "operator", val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Operator" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Comparison</SelectLabel>
-                      {OPERATORS.filter(op => op.category === 'comparison').map((op) => (
-                        <SelectItem key={op.value} value={op.value} className="pl-4">
-                          <span className="text-sm">{op.label}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Text</SelectLabel>
-                      {OPERATORS.filter(op => op.category === 'string').map((op) => (
-                        <SelectItem key={op.value} value={op.value} className="pl-4">
-                          <div className="flex flex-col items-start">
-                            <span className="text-sm">{op.label}</span>
-                            {op.description && (
-                              <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                {op.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Array/List</SelectLabel>
-                      {OPERATORS.filter(op => op.category === 'array').map((op) => (
-                        <SelectItem key={op.value} value={op.value} className="pl-4">
-                          <div className="flex flex-col items-start">
-                            <span className="text-sm">{op.label}</span>
-                            {op.description && (
-                              <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                {op.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Logical</SelectLabel>
-                      {OPERATORS.filter(op => op.category === 'logical').map((op) => (
-                        <SelectItem key={op.value} value={op.value} className="pl-4">
-                          <div className="flex flex-col items-start">
-                            <span className="text-sm">{op.label}</span>
-                            {op.description && (
-                              <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                {op.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Date</SelectLabel>
-                      {OPERATORS.filter(op => op.category === 'date').map((op) => (
-                        <SelectItem key={op.value} value={op.value} className="pl-4">
-                          <div className="flex flex-col items-start">
-                            <span className="text-sm">{op.label}</span>
-                            {op.description && (
-                              <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                {op.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">Value</Label>
-                <NavigationRuleValueInput
-                  value={rule.value as any}
-                  onChange={(val) => handleRuleChange(index, "value", val)}
-                  operator={OPERATORS.find(op => op.value === rule.operator) || OPERATORS[0]}
-                  availableVariables={fieldOptions}
-                  fieldType={data.type === 'number' ? 'number' : 'text'}
-                  fieldOptions={getFieldOptions(rule.field)}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-sm">Target</Label>
-                <Select
-                  value={
-                    rule.target === "submit"
-                      ? "submit"
-                      : rule.isPage
-                        ? `page:${rule.target}`
-                        : `block:${rule.target}`
-                  }
-                  onValueChange={(val) => handleTargetChange(index, val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Pages</SelectLabel>
-                      {pageOptions.map((p) => (
-                        <SelectItem key={`page-${p.uuid}`} value={`page:${p.uuid}`} className="pl-4">
-                          <span className="text-sm">{p.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Blocks</SelectLabel>
-                      {blockOptions.map((b) => (
-                        <SelectItem key={`block-${b.uuid}`} value={`block:${b.uuid}`} className="pl-4">
-                          <span className="text-sm">{b.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectItem value="submit" className="font-medium">
-                      <span className="text-sm">Submit Form</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {!hideRemoveButton && (
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeRule(index)}
-                >
-                  Remove Rule
-                </Button>
-              </div>
-            )}
+            {renderRuleBody(rule, index)}
           </SortableItem>
       );
     }
     return (
         <div key={rule.id} className="border rounded-md p-3 space-y-3 my-2 bg-background">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-sm">Variable</Label>
-              <Select
-                value={rule.field}
-                onValueChange={(val) => handleRuleChange(index, "field", val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select field" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                  {fieldOptions.map((name) => (
-                    <SelectItem key={name} value={name} className="pl-2">
-                      <span className="text-sm">{name}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Operator</Label>
-              <Select
-                value={rule.operator}
-                onValueChange={(val) => handleRuleChange(index, "operator", val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Operator" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Comparison</SelectLabel>
-                    {OPERATORS.filter(op => op.category === 'comparison').map((op) => (
-                      <SelectItem key={op.value} value={op.value} className="pl-4">
-                        <span className="text-sm">{op.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Text</SelectLabel>
-                    {OPERATORS.filter(op => op.category === 'string').map((op) => (
-                      <SelectItem key={op.value} value={op.value} className="pl-4">
-                        <div className="flex flex-col items-start">
-                          <span className="text-sm">{op.label}</span>
-                          {op.description && (
-                            <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                              {op.description}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Array/List</SelectLabel>
-                    {OPERATORS.filter(op => op.category === 'array').map((op) => (
-                      <SelectItem key={op.value} value={op.value} className="pl-4">
-                        <div className="flex flex-col items-start">
-                          <span className="text-sm">{op.label}</span>
-                          {op.description && (
-                            <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                              {op.description}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Logical</SelectLabel>
-                    {OPERATORS.filter(op => op.category === 'logical').map((op) => (
-                      <SelectItem key={op.value} value={op.value} className="pl-4">
-                        <div className="flex flex-col items-start">
-                          <span className="text-sm">{op.label}</span>
-                          {op.description && (
-                            <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                              {op.description}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Date</SelectLabel>
-                    {OPERATORS.filter(op => op.category === 'date').map((op) => (
-                      <SelectItem key={op.value} value={op.value} className="pl-4">
-                        <div className="flex flex-col items-start">
-                          <span className="text-sm">{op.label}</span>
-                          {op.description && (
-                            <span className="text-xs text-muted-foreground max-w-[200px] truncate">
-                              {op.description}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Value</Label>
-              <NavigationRuleValueInput
-                value={rule.value as any}
-                onChange={(val) => handleRuleChange(index, "value", val)}
-                operator={OPERATORS.find(op => op.value === rule.operator) || OPERATORS[0]}
-                availableVariables={fieldOptions}
-                fieldType={data.type === 'number' ? 'number' : 'text'}
-                fieldOptions={getFieldOptions(rule.field)}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-sm">Target</Label>
-              <Select
-                value={
-                  rule.target === "submit"
-                    ? "submit"
-                    : rule.isPage
-                      ? `page:${rule.target}`
-                      : `block:${rule.target}`
-                }
-                onValueChange={(val) => handleTargetChange(index, val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto z-50" side="bottom" align="start" sideOffset={5}>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Pages</SelectLabel>
-                    {pageOptions.map((p) => (
-                      <SelectItem key={`page-${p.uuid}`} value={`page:${p.uuid}`} className="pl-4">
-                        <span className="text-sm">{p.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">Blocks</SelectLabel>
-                    {blockOptions.map((b) => (
-                      <SelectItem key={`block-${b.uuid}`} value={`block:${b.uuid}`} className="pl-4">
-                        <span className="text-sm">{b.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectItem value="submit" className="font-medium">
-                    <span className="text-sm">Submit Form</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {!hideRemoveButton && (
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => removeRule(index)}
-              >
-                Remove Rule
-              </Button>
-            </div>
-          )}
+          {renderRuleBody(rule, index)}
         </div>
     );
-  }, [fieldOptions, pageOptions, blockOptions, handleRuleChange, handleTargetChange, removeRule, data.type, getFieldOptions, hideRemoveButton]);
+  };
 
   // Don't render the editor if there's only one page or one block
   if (!shouldShowEditor) {

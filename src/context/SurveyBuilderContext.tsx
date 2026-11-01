@@ -833,6 +833,11 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
       // Check if this is the current block
       if (node.uuid === currentBlockId || node.fieldName === currentBlockId) {
         found = true;
+        // A page's rules can read every block on it
+        if (node.type === "set") {
+          fieldNames.push(...collectFieldsFromBlocks(node.items || [], {}));
+          return;
+        }
       }
 
       // Add this node's field names if it has any

@@ -14,7 +14,9 @@ import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
 import { BlockLockControl, BlockLockFieldset } from "../../common/BlockLock";
 import { BlockLockProvider } from "../../../context/BlockLockContext";
 import { isBlockLocked, isBlockUpdateAllowed } from "../../../utils/blockLock";
-import { Lock, PieChart } from "lucide-react";
+import { VisibilityEditor } from "../../common/VisibilityEditor";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
+import { Lock, PieChart, EyeOff } from "lucide-react";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
 const NavigationRulesEditor = lazy(() => import("../../common/NavigationRulesEditor").then(m => ({ default: m.NavigationRulesEditor })));
@@ -25,12 +27,20 @@ interface ContentBlockItemProps {
   data: BlockData;
   onUpdate: (data: BlockData) => void;
   onRemove: () => void;
+  /** The block sits on a page, whose own rules decide where Continue goes */
+  inPage?: boolean;
+  /** Where the block can move: pages, or out of its page */
+  moveTargets?: Array<{ value: string; label: string }>;
+  onMove?: (target: string) => void;
 }
 
 export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
   data,
   onUpdate,
   onRemove,
+  inPage = false,
+  moveTargets = [],
+  onMove,
 }) => {
   const { state } = useSurveyBuilder();
   const [isEditing, setIsEditing] = useState(false);
@@ -93,8 +103,28 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
               Locked
             </Badge>
           )}
+          {data.visibility && (
+            <Badge variant="secondary" className="gap-1">
+              <EyeOff className="h-3 w-3" />
+              {data.visibility.initial === "hidden" ? "Hidden until" : "Visible unless"}
+            </Badge>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+          {onMove && moveTargets.length > 0 && (
+            <Select value="" onValueChange={onMove}>
+              <SelectTrigger className="h-8 w-[140px] text-sm" aria-label="Move block">
+                <SelectValue placeholder="Move to…" />
+              </SelectTrigger>
+              <SelectContent>
+                {moveTargets.map((target) => (
+                  <SelectItem key={target.value} value={target.value}>
+                    {target.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogTrigger asChild>
               <Button type="button"
@@ -141,9 +171,18 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                     <BlockLockFieldset paths={["abTest"]}>
                       <ABTestEditor data={data} onUpdate={update} />
                     </BlockLockFieldset>
-                    <BlockLockFieldset paths={["navigationRules"]}>
-                      <NavigationRulesEditor data={data} onUpdate={update} />
+                    <BlockLockFieldset paths={["visibility"]}>
+                      <VisibilityEditor data={data} onUpdate={update} />
                     </BlockLockFieldset>
+                    {inPage ? (
+                      <p className="mt-4 border rounded-md p-4 text-sm text-muted-foreground">
+                        This block is on a page. The page's navigation rules decide where Continue goes.
+                      </p>
+                    ) : (
+                      <BlockLockFieldset paths={["navigationRules"]}>
+                        <NavigationRulesEditor data={data} onUpdate={update} />
+                      </BlockLockFieldset>
+                    )}
                     <BlockLockFieldset paths={["validationRules"]}>
                       <ValidationRulesEditor data={data} onUpdate={update} />
                     </BlockLockFieldset>

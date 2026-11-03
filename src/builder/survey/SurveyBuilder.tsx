@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useMemo, forwardRef, useImperativeHandle } from "react";
 import { Button } from "../../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
@@ -7,7 +7,8 @@ import { LocalizationEditor } from "./helpers/LocalizationEditor";
 import { v4 as uuidv4 } from "uuid";
 import { BlockLibrary } from "./panels/BlockLibrary";
 import { JsonEditor } from "./helpers/JsonEditor";
-import { BlockDefinition, BlockOverrides, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, SurveyMode, EditorMode } from "../../types";
+import { BlockDefinition, BlockOverrides, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, PageLayoutDefinition, SurveyMode, EditorMode } from "../../types";
+import { registerPageLayout } from "../../renderer/layouts/pageLayouts";
 import { SurveyBuilderProvider, useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import { SurveyGraph } from "./SurveyGraph";
 import { ThemeBuilder } from "./panels/ThemeBuilder";
@@ -56,6 +57,11 @@ interface SurveyBuilderProps {
    * receive them so they can bind blocks to external keys.
    */
   externalFields?: ExternalField[];
+  /**
+   * Page layouts a page can pick, added to the page layout registry so the
+   * Pages tab lists them and the preview draws them.
+   */
+  pageLayoutDefinitions?: PageLayoutDefinition[];
 }
 
 // Ref handle interface - methods exposed to parent components
@@ -82,7 +88,11 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   hideBlockLockControls = false,
   blockOverrides,
   externalFields,
+  pageLayoutDefinitions,
 }, ref) => {
+  // Registered before the first render, so the Pages tab lists them right away
+  useMemo(() => pageLayoutDefinitions?.forEach(registerPageLayout), [pageLayoutDefinitions]);
+
   return (
     <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} mode={mode} externalFields={externalFields}>
       <SurveyBuilderContent

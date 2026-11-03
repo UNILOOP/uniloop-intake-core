@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState, Suspense, lazy } from "react";
+import { useState, useMemo, Suspense, lazy } from "react";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader, CardFooter } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
@@ -17,6 +17,7 @@ import { isBlockLocked, isBlockUpdateAllowed } from "../../../utils/blockLock";
 import { VisibilityEditor } from "../../common/VisibilityEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { Lock, PieChart, EyeOff } from "lucide-react";
+import { findForwardVisibilityRefs } from "../helpers/pageItems";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
 const NavigationRulesEditor = lazy(() => import("../../common/NavigationRulesEditor").then(m => ({ default: m.NavigationRulesEditor })));
@@ -47,6 +48,10 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
   const [isReplacing, setIsReplacing] = useState(false);
   const blockDefinition = state.definitions.blocks[data.type];
   const locked = isBlockLocked(data);
+  const forwardFields = useMemo(
+    () => (data.visibility && data.uuid ? findForwardVisibilityRefs(state.rootNode?.items || [])[data.uuid] : undefined),
+    [data.visibility, data.uuid, state.rootNode],
+  );
 
   // Every edit to this block goes through here, so its lock holds for the
   // settings dialog, the block's own inline editing and replace.
@@ -108,6 +113,11 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
               <EyeOff className="h-3 w-3" />
               {data.visibility.initial === "hidden" ? "Hidden until" : "Visible unless"}
             </Badge>
+          )}
+          {forwardFields && (
+            <span role="note" className="text-xs rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
+              This rule uses {forwardFields.join(", ")}, which comes after this block
+            </span>
           )}
         </div>
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">

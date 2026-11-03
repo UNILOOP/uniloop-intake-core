@@ -133,6 +133,8 @@ interface SurveyFormProviderProps {
   enableDebug?: boolean;
   logo?: any;
   abTestPreviewMode?: boolean; // If true, bypasses storage and selects fresh variants each time
+  /** The form runs in the builder's preview */
+  isPreview?: boolean;
   analytics?: any; // Analytics configuration passed from SurveyForm
   customData?: any; // Custom data for custom blocks
   /** System block type to the registered block type that renders in its place. */
@@ -179,6 +181,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   debug = false,
   logo = null,
   abTestPreviewMode = false,
+  isPreview = false,
   analytics,
   customData,
   blockOverrides,
@@ -1378,6 +1381,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         isCurrentPageValid,
         logo,
         abTestPreviewMode,
+        isPreview,
         analytics,
         customData,
         blockOverrides,

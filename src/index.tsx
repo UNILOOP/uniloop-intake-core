@@ -107,6 +107,11 @@ export {
   registerLayout,
   unregisterLayout,
   getLayoutComponent,
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  registerPageLayout,
+  unregisterPageLayout,
   RenderPageSurveyLayout,
   CurrentBlock,
   NavigationButtons,
@@ -234,6 +239,8 @@ export type {
   // Layout types
   LayoutDefinition,
   LayoutProps,
+  PageLayoutDefinition,
+  PageLayoutProps,
 
   // Localization types
   LocalizationMap,

@@ -20,6 +20,7 @@ export const PreviewSurvey: React.FC<PreviewSurveyProps> = ({ layout, logo = nul
           mode={state.mode}
           enableDebug={false}
           abTestPreviewMode={true}
+          isPreview
           layout={layout}
           logo={logo}
           customData={state.customData}

@@ -19,7 +19,8 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { GripVertical, Plus } from "lucide-react";
 import { ContentBlockItem } from "../blocks/ContentBlockItem";
-import { isPageItem, moveBlock, removePageKeepingBlocks } from "../helpers/pageItems";
+import { addPage, isPageItem, moveBlock, removePageKeepingBlocks } from "../helpers/pageItems";
+import { getAllPageLayoutDefinitions } from "../../../renderer/layouts/pageLayouts";
 
 // Lazy load ContentBlockPage - only used for pages
 const ContentBlockPage = lazy(() => import("../blocks/ContentBlockPage").then(m => ({ default: m.ContentBlockPage })));
@@ -180,14 +181,11 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   // === Pages among single blocks (pageless mode) ===
   const isPage = isPageItem;
 
-  const handleAddHybridPage = () => {
-    const pageCount = (data.items || []).filter(isPage).length;
+  // Stacked is the default view, so its pages don't save a layout name
+  const handleAddHybridPage = (layoutName: string, index?: number) => {
     onUpdate({
       ...data,
-      items: [
-        ...(data.items || []),
-        { type: "set", name: `Page ${pageCount + 1}`, uuid: uuidv4(), items: [] },
-      ],
+      items: addPage(data.items || [], layoutName === "stacked" ? undefined : layoutName, index),
     });
   };
 
@@ -253,52 +251,79 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
       </Button>
     );
 
+    const renderPageLayouts = () => (
+      <div className="flex flex-col gap-1.5">
+        {getAllPageLayoutDefinitions().map((layout) => (
+          <Button
+            type="button"
+            key={layout.name}
+            variant="outline"
+            onClick={() => handleAddHybridPage(layout.name)}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("application/x-page-layout", layout.name);
+            }}
+            title={layout.description}
+            className="h-auto flex-col items-stretch gap-1 w-full p-2 text-xs whitespace-normal"
+          >
+            {layout.renderPreview && <div className="pointer-events-none">{layout.renderPreview()}</div>}
+            <span className="font-medium text-left truncate">{layout.label || layout.name}</span>
+            {layout.description && (
+              <span className="text-muted-foreground text-left font-normal">{layout.description}</span>
+            )}
+          </Button>
+        ))}
+        <p className="text-xs text-muted-foreground mt-1.5">
+          A page shows several blocks on one screen. Click to add one or drag it to the form.
+        </p>
+      </div>
+    );
+
     return (
       <div className="w-56 flex-shrink-0 rounded-xl border-1 bg-muted/30 p-3 overflow-y-auto max-h-[70vh] sticky top-0">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAddHybridPage}
-          className="justify-start w-full text-xs mb-1.5"
-        >
-          <Plus className="mr-1.5 h-3 w-3" />
-          <span className="truncate">Page</span>
-        </Button>
-        <p className="text-xs text-muted-foreground mb-3">
-          Several blocks on one screen
-        </p>
+        <Tabs defaultValue="blocks" className="w-full">
+          <TabsList className="w-full mb-3">
+            <TabsTrigger value="blocks" className="text-xs flex-1">Blocks</TabsTrigger>
+            <TabsTrigger value="pages" className="text-xs flex-1">Pages</TabsTrigger>
+          </TabsList>
 
-        <h4 className="text-sm font-semibold mb-3">Add Block</h4>
+          <TabsContent value="pages" className="mt-0">
+            {renderPageLayouts()}
+          </TabsContent>
 
-        {hasCustomBlocks ? (
-          <Tabs defaultValue="default" className="w-full">
-            <TabsList className="w-full mb-2">
-              <TabsTrigger value="default" className="text-xs flex-1">Default</TabsTrigger>
-              <TabsTrigger value="custom" className="text-xs flex-1">Custom</TabsTrigger>
-            </TabsList>
+          <TabsContent value="blocks" className="mt-0">
+            <h4 className="text-sm font-semibold mb-3">Add Block</h4>
 
-            <TabsContent value="default" className="mt-0">
+            {hasCustomBlocks ? (
+              <Tabs defaultValue="default" className="w-full">
+                <TabsList className="w-full mb-2">
+                  <TabsTrigger value="default" className="text-xs flex-1">Default</TabsTrigger>
+                  <TabsTrigger value="custom" className="text-xs flex-1">Custom</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="default" className="mt-0">
+                  <div className="flex flex-col gap-1.5">
+                    {defaultBlocks.map(renderBlockButton)}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="custom" className="mt-0">
+                  <div className="flex flex-col gap-1.5">
+                    {customBlocks.map(renderBlockButton)}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            ) : (
               <div className="flex flex-col gap-1.5">
                 {defaultBlocks.map(renderBlockButton)}
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="custom" className="mt-0">
-              <div className="flex flex-col gap-1.5">
-                {customBlocks.map(renderBlockButton)}
-              </div>
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {defaultBlocks.map(renderBlockButton)}
-          </div>
-        )}
-
-        <p className="text-xs text-muted-foreground mt-3">
-          Click to add or drag blocks to the form
-        </p>
+            <p className="text-xs text-muted-foreground mt-3">
+              Click to add or drag blocks to the form
+            </p>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
@@ -314,7 +339,10 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
         }
       `}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-block-type")) {
+        if (
+          e.dataTransfer.types.includes("application/x-block-type") ||
+          e.dataTransfer.types.includes("application/x-page-layout")
+        ) {
           e.preventDefault();
           e.stopPropagation();
           setDragOverIndex(index);
@@ -331,8 +359,11 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const type = e.dataTransfer.getData("application/x-block-type");
+        const layoutName = e.dataTransfer.getData("application/x-page-layout");
         if (type) {
           handleAddBlockItem(type, index);
+        } else if (layoutName) {
+          handleAddHybridPage(layoutName, index);
         }
         setDragOverIndex(null);
       }}
@@ -414,7 +445,10 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
           <div
             className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center"
             onDragOver={(e) => {
-              if (e.dataTransfer.types.includes("application/x-block-type")) {
+              if (
+                e.dataTransfer.types.includes("application/x-block-type") ||
+                e.dataTransfer.types.includes("application/x-page-layout")
+              ) {
                 e.preventDefault();
                 setDragOverIndex(0);
               }
@@ -422,8 +456,11 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
             onDragLeave={() => setDragOverIndex(null)}
             onDrop={(e) => {
               const type = e.dataTransfer.getData("application/x-block-type");
+              const layoutName = e.dataTransfer.getData("application/x-page-layout");
               if (type) {
                 handleAddBlockItem(type, 0);
+              } else if (layoutName) {
+                handleAddHybridPage(layoutName, 0);
               }
               setDragOverIndex(null);
             }}

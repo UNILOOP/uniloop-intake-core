@@ -99,6 +99,14 @@ export function getLayoutComponent(
   return RenderPageSurveyLayout;
 }
 
+export {
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  registerPageLayout,
+  unregisterPageLayout,
+} from './pageLayouts';
+
 // Export the default layout for direct import
 export { RenderPageSurveyLayout };
 

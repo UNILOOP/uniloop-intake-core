@@ -55,6 +55,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   themeMode = 'light',
   layout,
   abTestPreviewMode = false,
+  isPreview = false,
   analytics,
   customData,
   blockOverrides,
@@ -385,6 +386,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             theme={themeConfig}
             logo={logo}
             abTestPreviewMode={abTestPreviewMode}
+            isPreview={isPreview}
             analytics={analytics}
             customData={customData}
             blockOverrides={blockOverrides}

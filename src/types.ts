@@ -422,6 +422,8 @@ export interface SurveyFormRendererProps {
   layout?: string | React.FC<LayoutProps>;
   // A/B testing configuration
   abTestPreviewMode?: boolean; // If true, bypasses storage and selects fresh variants each time
+  /** The form runs in the builder's preview, which shows notices meant for the form's author */
+  isPreview?: boolean;
   // Analytics configuration
   analytics?: {
     enabled?: boolean;
@@ -548,6 +550,40 @@ export interface LayoutDefinition {
   component: React.FC<LayoutProps>;
 }
 
+/**
+ * What a page layout receives. Values, errors, show/hide rules and Continue stay
+ * with the form; the layout only decides where each block goes.
+ *
+ * Call the helpers in the layout's own body. Blocks drawn only by a child
+ * component (tabs, an accordion) still show, but count as never drawn in the
+ * preview's notice.
+ */
+export interface PageLayoutProps {
+  /** The page as built, with its name and settings (not localized) */
+  page: BlockData;
+  /** Every block of the page as built, hidden ones included */
+  blocks: BlockData[];
+  /**
+   * Draws one block, by its position in the page as built or by its fieldName.
+   * A hidden block, a block already drawn, or a reference that matches no block
+   * draws nothing, so positions don't shift as answers show and hide blocks.
+   */
+  renderBlock: (ref: number | string) => React.ReactNode;
+  /** Draws every visible block not drawn yet, in page order. Call it after any renderBlock calls. */
+  renderBlocks: () => React.ReactNode;
+}
+
+export interface PageLayoutDefinition {
+  name: string;
+  /** Shown in the builder's Pages tab (falls back to the name) */
+  label?: string;
+  description?: string;
+  /** A plain function component gets the preview's notice about blocks it never draws */
+  component: React.ComponentType<PageLayoutProps>;
+  /** A small sketch of the layout for the builder's Pages tab */
+  renderPreview?: () => React.ReactNode;
+}
+
 export interface BlockRendererProps {
   block: BlockData;
   value?: any;
@@ -638,6 +674,7 @@ export interface SurveyFormContextProps {
   enableDebug?: boolean;
   logo?: any;
   abTestPreviewMode?: boolean;
+  isPreview?: boolean;
   analytics?: {
     surveyId?: string;
     sessionId?: string;
@@ -782,6 +819,8 @@ export interface BlockData {
   visibleIf?: any;
   /** Shows or hides the block as answers change; a hidden block outside a page is skipped */
   visibility?: BlockVisibility;
+  /** On a page: the registered page layout that places its blocks (stacked when unset) */
+  pageLayout?: string;
   isEndBlock?: boolean;
   /** Whether isEndBlock was manually set by the user (prevents auto-clearing) */
   isEndBlockManual?: boolean;

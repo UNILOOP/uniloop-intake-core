@@ -70,10 +70,21 @@ export { SimpleCustomField } from './examples/SimpleCustomField';
 
 export type { ExternalField } from './external';
 
+// Page layouts a page can pick in the builder
+export {
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  registerPageLayout,
+  unregisterPageLayout,
+} from './renderer/layouts/pageLayouts';
+
 // Re-export types needed for building
 export type {
   NodeDefinition,
   BlockDefinition,
+  PageLayoutDefinition,
+  PageLayoutProps,
   NodeData,
   BlockData,
   GlobalCustomField,

@@ -26,6 +26,7 @@ import { ContentBlockItem } from "./ContentBlockItem";
 import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
+import { getAllPageLayoutDefinitions, getPageLayoutDefinition } from "../../../renderer/layouts/pageLayouts";
 import { containsLockedBlock } from "../../../utils/blockLock";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 
@@ -58,6 +59,16 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   // Removing a hybrid page keeps its blocks, so a locked block doesn't stop it
   const removeDisabled = !hybrid && containsLockedBlock(data);
+
+  const layoutName = data.pageLayout;
+  const layoutDefinition = layoutName ? getPageLayoutDefinition(layoutName) : undefined;
+  const layoutLabel = layoutName ? (layoutDefinition ? layoutDefinition.label || layoutDefinition.name : `${layoutName} (not available)`) : undefined;
+
+  // Stacked clears the setting, so a page without one keeps today's view
+  const handleLayoutChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { pageLayout: _cleared, ...rest } = data;
+    onUpdate(e.target.value && e.target.value !== "stacked" ? { ...data, pageLayout: e.target.value } : rest);
+  };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({
@@ -132,6 +143,11 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
             className="w-full sm:w-[300px]"
           />
         </div>
+        {hybrid && layoutLabel && (
+          <span className="text-xs bg-muted px-2 py-1 rounded-md" title="Page layout">
+            {layoutLabel}
+          </span>
+        )}
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
@@ -158,6 +174,22 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
                 <p className="text-sm text-muted-foreground">
                   The page shows its visible blocks together with one Continue. These rules decide where Continue goes; the blocks' own rules don't apply on a page.
                 </p>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Layout
+                  <select
+                    aria-label="Page layout"
+                    value={layoutName || "stacked"}
+                    onChange={handleLayoutChange}
+                    className="w-full px-3 py-2 border border-input bg-background text-sm font-normal rounded-md"
+                  >
+                    {getAllPageLayoutDefinitions().map((layout) => (
+                      <option key={layout.name} value={layout.name}>
+                        {layout.label || layout.name}
+                      </option>
+                    ))}
+                    {layoutName && !layoutDefinition && <option value={layoutName}>{layoutLabel}</option>}
+                  </select>
+                </label>
                 <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
                   <NavigationRulesEditor data={data} onUpdate={onUpdate} />
                 </Suspense>

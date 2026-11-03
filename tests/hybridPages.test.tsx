@@ -223,6 +223,14 @@ describe('pages at runtime', () => {
   test('progress counts a page as one step', () => {
     const form = mount(survey());
     expect(form.current!.getTotalVisibleSteps()).toBe(3);
+
+    // Entering a page is one history entry, so progress moves one step and one Back leaves it
+    act(() => form.current!.goToNextBlock({ name: 'Ada' }));
+    expect(form.current!.navigationHistory).toHaveLength(2);
+    expect(form.current!.getCurrentStepPosition()).toBe(1);
+
+    act(() => form.current!.goToPreviousBlock());
+    expect(form.current!.currentPage).toBe(0);
   });
 });
 

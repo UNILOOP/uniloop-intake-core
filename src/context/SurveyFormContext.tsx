@@ -695,7 +695,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       const lastEntry = prev[prev.length - 1];
       if (lastEntry &&
           lastEntry.pageUuid === pageUuid &&
-          lastEntry.blockUuid === blockUuid) {
+          (lastEntry.blockUuid ?? null) === blockUuid) {
         return prev;
       }
 

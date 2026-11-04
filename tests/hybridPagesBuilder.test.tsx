@@ -292,7 +292,13 @@ describe('show/hide rules that read a later field', () => {
     const show = (form: BlockData[]) => {
       const Card = () => {
         const { addBlockDefinition } = useSurveyBuilder();
-        React.useEffect(() => addBlockDefinition('textfield', TextInputBlock), []);
+        // addBlockDefinition is a new function each render, so register once.
+        const added = React.useRef(false);
+        React.useEffect(() => {
+          if (added.current) return;
+          added.current = true;
+          addBlockDefinition('textfield', TextInputBlock);
+        }, [addBlockDefinition]);
         return <ContentBlockItem data={form.find((item) => item.uuid === 'b-b')!} onUpdate={() => {}} onRemove={() => {}} />;
       };
       mount(<Card />, { type: 'section', uuid: 'root', items: form });

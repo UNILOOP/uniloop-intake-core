@@ -273,7 +273,9 @@ const LaidOutPage: React.FC<{
   };
   const renderBlocks = () => {
     const rest = visibleBlocks.filter(block => !drawn.has(block));
-    if (inLayoutRender) rest.forEach(block => drawn.add(block));
+    if (inLayoutRender) {
+      for (const block of rest) drawn.add(block);
+    }
     return rest.map(drawBlock);
   };
 

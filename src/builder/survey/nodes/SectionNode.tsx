@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { NodeData, BlockData } from "../../../types";
 import { containsLockedBlock } from "../../../utils/blockLock";
+import { isOrderChangeAllowed } from "../../../utils/pathGroupLock";
 import {
   Root as Sortable,
   Content as SortableContent,
@@ -101,6 +102,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   ) => {
     if (activeIndex === overIndex) return;
     const newItems = arrayMove(data.items || [], activeIndex, overIndex);
+    if (!isOrderChangeAllowed(data.items, newItems)) return;
     onUpdate({
       ...data,
       items: newItems,
@@ -139,6 +141,8 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
       // Append to end
       newItems = [...currentItems, newBlock];
     }
+    // A block added between two blocks of a locked path would change the path
+    if (!isOrderChangeAllowed(currentItems, newItems)) return;
 
     onUpdate({
       ...data,
@@ -170,6 +174,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   ) => {
     if (activeIndex === overIndex) return;
     const newItems = arrayMove(data.items || [], activeIndex, overIndex);
+    if (!isOrderChangeAllowed(data.items, newItems)) return;
     onUpdate({
       ...data,
       items: newItems,
@@ -345,8 +350,12 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
                     />
                   </div>
                 </SortableItem>
-                {/* Drop zone after each block */}
-                <DropZone index={index + 1} isActive={dragOverIndex === index + 1} />
+                {/* Drop zone after each block, except inside a locked path */}
+                {block.lockGroup && block.lockGroup.id === items[index + 1]?.lockGroup?.id ? (
+                  <div className="h-2" />
+                ) : (
+                  <DropZone index={index + 1} isActive={dragOverIndex === index + 1} />
+                )}
               </Fragment>
             ))}
           </SortableContent>

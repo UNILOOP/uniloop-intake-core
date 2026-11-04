@@ -195,6 +195,7 @@ export type { FieldNameUse, DuplicateFieldName } from './utils/duplicateFieldNam
 
 // Block lock state for a custom block's settings form
 export { useBlockLock } from './context/BlockLockContext';
+export { findPathGroup, lockPathGroup, releasePathGroup } from './utils/pathGroupLock';
 
 // --------------------------------------------------------------------------
 // Types - Export specific types needed for rendering (not export *)
@@ -211,6 +212,7 @@ export type {
   BlockDefinition,
   FieldNameConfig,
   BlockLockAccess,
+  LockGroup,
   BlockData,
   BlockRendererProps,
   AnswerViewProps,

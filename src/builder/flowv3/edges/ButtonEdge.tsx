@@ -95,6 +95,9 @@ const ButtonEdgeInner = ({
   const sourceDefinition = sourceBlock && state.definitions.blocks[sourceBlock.type];
   const rulesLocked = isBlockLinkLocked(sourceBlock, sourceDefinition, true);
   const nextStepLocked = isBlockLinkLocked(sourceBlock, sourceDefinition, false);
+  // Inserting between two blocks of a locked path would change the path
+  const targetBlock = blocksMap.get(target);
+  const insideLockedPath = !!sourceBlock?.lockGroup && sourceBlock.lockGroup.id === targetBlock?.lockGroup?.id;
 
   // State for reconnection drag
   const [isDragging, setIsDragging] = useState(false);
@@ -202,7 +205,7 @@ const ButtonEdgeInner = ({
 
   // Inserting a block re-points this link to the new block, so a locked link gets no insert button.
   const linkLocked = isExplicitRule ? rulesLocked : nextStepLocked;
-  const canInsert = showInsertButton && !linkLocked;
+  const canInsert = showInsertButton && !linkLocked && !insideLockedPath;
 
   // Only show start/end + buttons when this is the only edge from source
   // This prevents confusion when multiple edges share the same origin point

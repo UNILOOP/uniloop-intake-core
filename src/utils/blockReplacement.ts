@@ -19,6 +19,7 @@ type ResolvedOutputSchema = OutputSchemaScalar | OutputSchemaArray | OutputSchem
  * its form: its id, where its answer is stored, and the rules and links that read
  * or follow it. The lock flag stays with the block too; a locked block can't be
  * replaced, so it's only ever `false` here, from a block that was unlocked.
+ * A block whose position a locked path fixes keeps its place in that path.
  */
 const KEPT_FIELDS: readonly string[] = [
   'uuid',
@@ -30,6 +31,7 @@ const KEPT_FIELDS: readonly string[] = [
   'isEndBlockManual',
   'nextBlockId',
   'locked',
+  'lockGroup',
 ];
 
 /** The step settings every layout reads whatever the block; see applyStepSettings */

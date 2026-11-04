@@ -4,11 +4,12 @@ import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import type { FlowV3NodeData } from "../types";
 import { cn } from "../../../lib/utils";
 import { BlockData } from "../../../types";
-import { CircleDot, GripVertical, Lock, PieChart, Settings, Trash2, GitBranch, Replace } from "lucide-react";
+import { CircleDot, GripVertical, Lock, Pin, PieChart, Settings, Trash2, GitBranch, Replace } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
 import { useBlocksMap } from "../utils/BlocksMapContext";
-import { isBlockLocked, isBlockPathLocked } from "../../../utils/blockLock";
+import { isBlockLocked, isBlockPathLocked, isBlockRemovalLocked } from "../../../utils/blockLock";
+import { usePathGroupNote } from "../../common/BlockLock";
 
 // Custom Node Component - Performance optimized
 // Using areEqual comparison to prevent unnecessary re-renders
@@ -34,15 +35,19 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
   );
 
   const locked = isBlockLocked(block);
+  // A path group also keeps the blocks whose place it fixes
+  const removalLocked = isBlockRemovalLocked(block);
+  const groupRole = block.lockGroup?.role;
+  const groupNote = usePathGroupNote(block);
   // Adding a branch adds a navigation rule to this block.
   const canAddBranch = !isBlockPathLocked(block, blockDefinition, "navigationRules");
 
   // Stable reference for delete - only depends on id and deleteElements
   const handleDelete = useCallback((e?: React.MouseEvent) => {
       e?.stopPropagation();
-      if (locked) return;
+      if (removalLocked) return;
       deleteElements({ nodes: [{ id }] });
-  }, [id, locked, deleteElements]);
+  }, [id, removalLocked, deleteElements]);
 
   // Stable reference - only depends on id and block.uuid
   const handleConfigure = useCallback((e: React.MouseEvent) => {
@@ -123,9 +128,15 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
             </Badge>
           )}
           {locked && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant="secondary" className="gap-1" title={groupNote ?? undefined}>
               <Lock className="h-3 w-3" />
-              Locked
+              {groupRole === "root" || groupRole === "member" ? "Path locked" : "Locked"}
+            </Badge>
+          )}
+          {groupRole === "orderFixed" && (
+            <Badge variant="outline" className="gap-1" title={groupNote ?? undefined}>
+              <Pin className="h-3 w-3" />
+              Position fixed
             </Badge>
           )}
         </div>
@@ -169,7 +180,7 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
               <Replace className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
           </Button>
         )}
-        {!hasActiveRules && !locked && (
+        {!hasActiveRules && !removalLocked && (
           <Button
               variant="destructive"
               size="icon"
@@ -229,6 +240,7 @@ const areEqual = (
   if (prevBlock.label !== nextBlock.label) return false;
   if (prevBlock.isEndBlock !== nextBlock.isEndBlock) return false;
   if (prevBlock.locked !== nextBlock.locked) return false;
+  if (prevBlock.lockGroup?.role !== nextBlock.lockGroup?.role) return false;
 
   // Check navigation rules (shallow compare length and targets)
   const prevRules = prevBlock.navigationRules || [];

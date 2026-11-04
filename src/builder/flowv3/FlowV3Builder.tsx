@@ -36,7 +36,7 @@ import { BlockSelectorDialog } from "./BlockSelectorDialog";
 import { ReplaceBlockDialog } from "../common/ReplaceBlockDialog";
 import { Button } from "../../components/ui/button";
 import { BlocksMapProvider } from "./utils/BlocksMapContext";
-import { isBlockLinkLocked, isBlockLocked, isBlockUpdateAllowed } from "../../utils/blockLock";
+import { isBlockLinkLocked, isBlockLocked, isBlockRemovalLocked, isBlockUpdateAllowed } from "../../utils/blockLock";
 
 import { Plus, ArrowUpToLine, ArrowDownToLine, Pencil } from "lucide-react";
 
@@ -281,7 +281,7 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
     async ({ nodes: toDelete, edges: edgesToDelete }) => {
       const lockedIds = new Set(
         toDelete
-          .filter((n) => n.type === "survey-node" && isBlockLocked(blocksMap.get(n.id)))
+          .filter((n) => n.type === "survey-node" && isBlockRemovalLocked(blocksMap.get(n.id)))
           .map((n) => n.id)
       );
       const deletedIds = new Set(toDelete.filter((n) => !lockedIds.has(n.id)).map((n) => n.id));
@@ -512,6 +512,12 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
         ? (currentState.rootNode?.items as BlockData[] | undefined)?.find(b => b.uuid === sourceBlockId)
         : undefined;
       if (insertSource && isBlockLinkLocked(insertSource, currentState.definitions.blocks[insertSource.type], !!rule)) return;
+      // A block inserted between two blocks of a locked path would change the path
+      const { targetBlockId } = customEvent.detail;
+      const insertTarget = targetBlockId
+        ? (currentState.rootNode?.items as BlockData[] | undefined)?.find(b => b.uuid === targetBlockId)
+        : undefined;
+      if (insertSource?.lockGroup && insertSource.lockGroup.id === insertTarget?.lockGroup?.id) return;
       setInsertIndex(customEvent.detail.insertIndex);
       setInsertTargetId(customEvent.detail.targetBlockId || null);
       setInsertSourceId(customEvent.detail.sourceBlockId || null);

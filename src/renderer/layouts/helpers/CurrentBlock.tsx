@@ -3,8 +3,9 @@ import { SurveyFormContext, useSurveyForm } from '../../../context/SurveyFormCon
 import { BlockRenderer } from '../../renderers/BlockRenderer';
 import { getBlockFieldErrors } from '../../../utils/blockFields';
 import { getSurveyPages, detectSurveyMode } from '../../../utils/surveyUtils';
-import { getPageLayoutDefinition } from '../pageLayouts';
-import type { BlockData, PageLayoutProps } from '../../../types';
+import { markPageOverrideFailed, resolvePageLayout, usePageOverrideFailures } from '../pageLayouts';
+import { NavigationButtons } from './NavigationButtons';
+import type { BlockData, PageLayoutDefinition, PageLayoutProps } from '../../../types';
 
 interface CurrentBlockProps {
   /**
@@ -191,8 +192,36 @@ const layoutKey = (Layout: object) => {
 };
 
 /**
- * A page step: picks the page layout (the page's own, else `renderPage`, else
- * stacked) and gives it the helpers that draw blocks.
+ * Draws a page override, and the page it replaces if the override throws, so a
+ * broken override never leaves an empty step.
+ */
+class PageOverrideBoundary extends React.Component<
+  { pageName: string; overrideName: string; fallback: React.ReactNode; children?: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    // Recorded, so the page resolves to the system layout and the form layout draws its own Continue again
+    if (!markPageOverrideFailed(this.props.pageName, this.props.overrideName)) return;
+    console.error(
+      `[pageOverrides] "${this.props.overrideName}" failed to render in place of "${this.props.pageName}", so the system page is shown instead.`,
+      error
+    );
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * A page step: picks the page layout (its override, else the page's own, else
+ * `renderPage`, else stacked) and gives it the helpers that draw blocks.
  */
 const PageStep: React.FC<{
   page: BlockData;
@@ -202,15 +231,15 @@ const PageStep: React.FC<{
   onValueChange?: (fieldName: string, value: any) => void;
   renderPage?: React.ComponentType<PageLayoutProps>;
 }> = ({ page, blocks, visibleBlocks, inputRef, onValueChange, renderPage }) => {
-  const { isPreview } = useSurveyForm();
+  const { isPreview, pageOverrides } = useSurveyForm();
+  usePageOverrideFailures();
 
   const layoutName = page.pageLayout;
-  const definition = layoutName ? getPageLayoutDefinition(layoutName) : undefined;
+  const { definition, system, overrideName } = resolvePageLayout(layoutName, pageOverrides);
   if (layoutName && !definition && !warnedPageLayouts.has(layoutName)) {
     warnedPageLayouts.add(layoutName);
     console.warn(`Page layout "${layoutName}" isn't registered, so the page "${page.name ?? page.uuid}" falls back.`);
   }
-  const Layout = definition?.component ?? renderPage;
 
   // The first visible block takes the focus, wherever the layout puts it
   const drawBlock = (block: BlockData) => (
@@ -223,18 +252,29 @@ const PageStep: React.FC<{
     />
   );
 
-  if (!Layout) return <>{visibleBlocks.map(drawBlock)}</>;
+  const drawPage = (pageLayout: PageLayoutDefinition | undefined) => {
+    const Layout = pageLayout?.component ?? renderPage;
+    if (!Layout) return <>{visibleBlocks.map(drawBlock)}</>;
+    return (
+      <LaidOutPage
+        key={layoutKey(Layout)}
+        Layout={Layout}
+        ownsNavigation={!!pageLayout?.ownsNavigation}
+        page={page}
+        blocks={blocks}
+        visibleBlocks={visibleBlocks}
+        drawBlock={drawBlock}
+        isPreview={!!isPreview}
+      />
+    );
+  };
+
+  if (!overrideName || !layoutName) return drawPage(definition);
 
   return (
-    <LaidOutPage
-      key={layoutKey(Layout)}
-      Layout={Layout}
-      page={page}
-      blocks={blocks}
-      visibleBlocks={visibleBlocks}
-      drawBlock={drawBlock}
-      isPreview={!!isPreview}
-    />
+    <PageOverrideBoundary key={overrideName} pageName={layoutName} overrideName={overrideName} fallback={drawPage(system)}>
+      {drawPage(definition)}
+    </PageOverrideBoundary>
   );
 };
 
@@ -247,14 +287,16 @@ const PageStep: React.FC<{
  */
 const LaidOutPage: React.FC<{
   Layout: React.ComponentType<PageLayoutProps>;
+  ownsNavigation: boolean;
   page: BlockData;
   blocks: BlockData[];
   visibleBlocks: BlockData[];
   drawBlock: (block: BlockData) => React.ReactNode;
   isPreview: boolean;
-}> = ({ Layout, page, blocks, visibleBlocks, drawBlock, isPreview }) => {
+}> = ({ Layout, ownsNavigation, page, blocks, visibleBlocks, drawBlock, isPreview }) => {
   const drawn = new Set<BlockData>();
   let inLayoutRender = true;
+  let navigationDrawn = false;
 
   const find = (ref: number | string) =>
     typeof ref === 'number'
@@ -279,7 +321,12 @@ const LaidOutPage: React.FC<{
     return rest.map(drawBlock);
   };
 
-  const props: PageLayoutProps = { page, blocks, renderBlock, renderBlocks };
+  const renderNavigation = (navigationProps?: React.ComponentProps<typeof NavigationButtons>) => {
+    navigationDrawn = true;
+    return <NavigationButtons showPrevious={false} {...navigationProps} drawnByPage />;
+  };
+
+  const props: PageLayoutProps = { page, blocks, renderBlock, renderBlocks, renderNavigation };
   const isPlainFunction = typeof Layout === 'function' && !(Layout as any).prototype?.isReactComponent;
   const content = isPlainFunction ? (Layout as React.FC<PageLayoutProps>)(props) : <Layout {...props} />;
   inLayoutRender = false;
@@ -287,15 +334,25 @@ const LaidOutPage: React.FC<{
   const undrawnNames = isPlainFunction
     ? visibleBlocks.filter(block => !drawn.has(block)).map(block => block.fieldName ?? block.name ?? block.uuid).join(', ')
     : '';
+  // A layout that owns the Continue but never draws it would leave the page without one
+  const continueMissing = isPlainFunction && ownsNavigation && !navigationDrawn;
   useEffect(() => {
     if (undrawnNames) console.warn(`The page layout never draws these visible blocks: ${undrawnNames}`);
   }, [undrawnNames]);
+  useEffect(() => {
+    if (continueMissing) console.warn("The page layout owns the page's Continue but never calls renderNavigation()");
+  }, [continueMissing]);
 
   return (
     <>
       {isPreview && undrawnNames && (
         <div role="alert" className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
           This page layout doesn't draw: {undrawnNames}
+        </div>
+      )}
+      {isPreview && continueMissing && (
+        <div role="alert" className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+          This page layout doesn't draw its Continue button.
         </div>
       )}
       {content}

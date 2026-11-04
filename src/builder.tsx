@@ -75,6 +75,7 @@ export {
   pageLayoutRegistry,
   getPageLayoutDefinition,
   getAllPageLayoutDefinitions,
+  resolvePageLayout,
   registerPageLayout,
   unregisterPageLayout,
 } from './renderer/layouts/pageLayouts';
@@ -92,6 +93,7 @@ export type {
   EditorMode,
   ContentBlockItemProps,
   BlockOverrides,
+  PageOverrides,
 } from './types';
 
 // Merging two versions of a form (see src/merge.tsx for the full surface)

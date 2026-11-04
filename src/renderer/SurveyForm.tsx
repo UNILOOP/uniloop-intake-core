@@ -59,6 +59,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   analytics,
   customData,
   blockOverrides,
+  pageOverrides,
   mode,
   external,
 }) => {
@@ -390,6 +391,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             analytics={analytics}
             customData={customData}
             blockOverrides={blockOverrides}
+            pageOverrides={pageOverrides}
             mode={mode ?? survey.mode}
             external={external}
             flattenPages={layout === 'chat' || layout === 'voice'}

@@ -1,8 +1,21 @@
 import React from 'react';
 import { useSurveyForm } from '../../../context/SurveyFormContext';
 import { getSurveyPages, detectSurveyMode } from '../../../utils/surveyUtils';
+import { resolvePageLayout, usePageOverrideFailures } from '../pageLayouts';
 
-interface NavigationButtonsProps {
+/**
+ * Whether the current step is a page whose layout draws its own Continue
+ * (`ownsNavigation`), so a form layout leaves its Continue out.
+ */
+export function usePageOwnsNavigation(): boolean {
+  const { isPageStep, currentPageNode, pageOverrides } = useSurveyForm();
+  // A failed override gives the Continue back to the form layout
+  usePageOverrideFailures();
+  if (!isPageStep) return false;
+  return !!resolvePageLayout(currentPageNode?.pageLayout, pageOverrides).definition?.ownsNavigation;
+}
+
+export interface NavigationButtonsProps {
   /**
    * Custom class name for the container
    */
@@ -56,6 +69,8 @@ interface NavigationButtonsProps {
    * Callback when navigation occurs
    */
   onNavigate?: (direction: 'previous' | 'next' | 'submit') => void;
+  /** Set by a page layout's `renderNavigation`, so its Continue shows on a page that owns it */
+  drawnByPage?: boolean;
 }
 
 /**
@@ -105,6 +120,7 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   renderPreviousButton,
   renderNextButton,
   onNavigate,
+  drawnByPage = false,
 }) => {
   const {
     currentPage,
@@ -128,8 +144,11 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   // A page's own settings decide its buttons
   const currentBlock = isPageStep ? currentPageNode : currentPageBlocks[currentBlockIndex];
 
+  // A page that draws its own Continue gets the only one
+  const pageOwnsNavigation = usePageOwnsNavigation();
+
   // Check if we should show the next button based on block configuration
-  const shouldShowNext = showNext && currentBlock?.showContinueButton !== false;
+  const shouldShowNext = showNext && currentBlock?.showContinueButton !== false && (drawnByPage || !pageOwnsNavigation);
 
   // Determine if we're on the final step
   const hasExplicitNavigation = (currentBlock?.nextBlockId && currentBlock.nextBlockId !== 'submit')

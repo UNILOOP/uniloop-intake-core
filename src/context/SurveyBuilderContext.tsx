@@ -5,6 +5,7 @@ import {
   type BlockData,
   type BlockDefinition,
   type BlockOverrides,
+  type PageOverrides,
   type GlobalCustomField,
   type LocalizationMap,
   type NodeData,
@@ -408,6 +409,8 @@ interface SurveyBuilderContextType {
   hideBlockLockControls: boolean;
   /** System block type to the registered block type that replaces it. */
   blockOverrides?: BlockOverrides;
+  /** Page name to the registered page layout that draws it in the preview. */
+  pageOverrides?: PageOverrides;
   // Field collection utilities (includes nested fields from output schemas)
   getAvailableFields: (currentBlockId: string) => string[];
   getAvailableFieldsBefore: (currentBlockId: string) => string[];
@@ -438,6 +441,7 @@ interface SurveyBuilderProviderProps {
   hideBlockLockControls?: boolean;
   /** System block type to the registered block type that replaces it. */
   blockOverrides?: BlockOverrides;
+  pageOverrides?: PageOverrides;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -458,6 +462,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   customData,
   hideBlockLockControls = false,
   blockOverrides,
+  pageOverrides,
   mode = 'pageless',
   externalFields = NO_EXTERNAL_FIELDS,
 }) => {
@@ -925,6 +930,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     customData: state.customData,
     hideBlockLockControls,
     blockOverrides,
+    pageOverrides,
     getAvailableFields,
     getAvailableFieldsBefore,
     getAvailableFieldsUptoCurrent,

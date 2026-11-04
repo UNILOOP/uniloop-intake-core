@@ -3,8 +3,9 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { SurveyFormProvider, useSurveyForm } from '../src/context/SurveyFormContext';
 import { CurrentBlock } from '../src/renderer/layouts/helpers/CurrentBlock';
+import { NavigationButtons } from '../src/renderer/layouts/helpers/NavigationButtons';
 import { registerPageLayout, unregisterPageLayout } from '../src/renderer/layouts/pageLayouts';
-import type { BlockData, PageLayoutProps } from '../src/types';
+import type { BlockData, PageLayoutProps, PageOverrides } from '../src/types';
 
 const required = [{ operator: 'isNotEmpty', message: 'Required' }];
 
@@ -40,12 +41,12 @@ afterEach(() => {
   registered.splice(0).forEach(unregisterPageLayout);
 });
 
-function register(name: string, component: React.FC<PageLayoutProps>) {
+function register(name: string, component: React.FC<PageLayoutProps>, ownsNavigation?: boolean) {
   registered.push(name);
-  registerPageLayout({ name, component });
+  registerPageLayout({ name, component, ownsNavigation });
 }
 
-function mount(data: ReturnType<typeof survey>, current: React.ReactNode = <CurrentBlock />, props: { isPreview?: boolean; initialValues?: Record<string, any> } = {}) {
+function mount(data: ReturnType<typeof survey>, current: React.ReactNode = <CurrentBlock />, props: { isPreview?: boolean; initialValues?: Record<string, any>; pageOverrides?: PageOverrides } = {}) {
   const probe: { current: ReturnType<typeof useSurveyForm> | null } = { current: null };
   const Probe = () => {
     probe.current = useSurveyForm();
@@ -218,5 +219,119 @@ describe('page layouts', () => {
     mount({ rootNode: { type: 'section', uuid: 'root', items: [twins] }, mode: 'pageless' }, <CurrentBlock />, { initialValues: { mode: 'b' } });
     expect(container!.querySelector('[data-column="top"]')!.querySelectorAll('input').length).toBe(1);
     expect(container!.querySelectorAll('input').length).toBe(1);
+  });
+});
+
+describe('page overrides', () => {
+  // The form layout's Continue sits under the page, as in createLayout
+  const form = (
+    <>
+      <CurrentBlock />
+      <NavigationButtons nextText="Form next" />
+    </>
+  );
+  const continueButtons = () =>
+    Array.from(container!.querySelectorAll('button[type="submit"]')).map((button) => button.textContent);
+
+  test('an override draws pages saved under the system name, and the saved name stays', () => {
+    register('system', ({ renderBlocks }) => <div data-page="system">{renderBlocks()}</div>);
+    register('custom', ({ renderBlocks }) => <div data-page="custom">{renderBlocks()}</div>);
+    const data = survey('system');
+    mount(data, <CurrentBlock />, { pageOverrides: { system: 'custom' } });
+    expect(container!.querySelector('[data-page="custom"]')!.querySelectorAll('input').length).toBe(2);
+    expect(container!.querySelector('[data-page="system"]')).toBeNull();
+    expect((data.rootNode.items[0] as BlockData).pageLayout).toBe('system');
+  });
+
+  test("an override that isn't registered warns once and draws the system page", () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    register('system', ({ renderBlocks }) => <div data-page="system">{renderBlocks()}</div>);
+    mount(survey('system'), <CurrentBlock />, { pageOverrides: { system: 'missing' } });
+    expect(container!.querySelector('[data-page="system"]')!.querySelectorAll('input').length).toBe(2);
+    expect(warn.mock.calls.filter(([message]) => String(message).includes('"missing"')).length).toBe(1);
+    warn.mockRestore();
+  });
+
+  test("an override that throws falls back to the system page, and the form layout's Continue comes back", () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {});
+    register('system', ({ renderBlocks }) => <div data-page="system">{renderBlocks()}</div>);
+    register('broken', () => {
+      throw new Error('broken page');
+    }, true);
+    mount(survey('system'), form, { pageOverrides: { system: 'broken' } });
+    expect(container!.querySelector('[data-page="system"]')!.querySelectorAll('input').length).toBe(2);
+    // The form layout draws its own Continue again
+    expect(continueButtons()).toEqual(['Form next']);
+    const logged = () => error.mock.calls.filter(([message]) => String(message).includes('[pageOverrides] "broken"')).length;
+    expect(logged()).toBe(1);
+
+    // Coming back to the page draws the system page straight away, without another log
+    act(() => root!.unmount());
+    container!.remove();
+    mount(survey('system'), form, { pageOverrides: { system: 'broken' } });
+    expect(container!.querySelector('[data-page="system"]')).not.toBeNull();
+    expect(logged()).toBe(1);
+    error.mockRestore();
+  });
+
+  test('an override that threw is tried again once it is registered again', () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {});
+    register('system', ({ renderBlocks }) => <div data-page="system">{renderBlocks()}</div>);
+    register('flaky', () => {
+      throw new Error('flaky page');
+    });
+    mount(survey('system'), <CurrentBlock />, { pageOverrides: { system: 'flaky' } });
+    expect(container!.querySelector('[data-page="system"]')).not.toBeNull();
+
+    act(() => register('flaky', ({ renderBlocks }) => <div data-page="flaky">{renderBlocks()}</div>));
+    expect(container!.querySelector('[data-page="flaky"]')).not.toBeNull();
+    error.mockRestore();
+  });
+
+  test('a page that owns its Continue draws it where it wants, and the form leaves its own out', () => {
+    register('system', ({ renderBlocks }) => <div data-page="system">{renderBlocks()}</div>);
+    register('owner', ({ renderBlocks, renderNavigation }) => (
+      <>
+        <div data-slot="top">{renderNavigation({ nextText: 'Page next' })}</div>
+        {renderBlocks()}
+      </>
+    ), true);
+    mount(survey('system'), form, { pageOverrides: { system: 'owner' } });
+    expect(continueButtons()).toEqual(['Page next']);
+    expect(container!.querySelector('[data-slot="top"] button[type="submit"]')).not.toBeNull();
+  });
+
+  test("the page's Continue checks its answers like the form's", () => {
+    register('owner', ({ renderBlocks, renderNavigation }) => (
+      <>
+        {renderBlocks()}
+        {renderNavigation({ nextText: 'Page next' })}
+      </>
+    ), true);
+    const probe = mount(survey('owner'), form);
+    const next = () => (container!.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+    // goal is required and empty
+    act(next);
+    expect(probe.current!.currentPage).toBe(0);
+    expect(probe.current!.errors.goal).toBe('Required');
+    act(() => probe.current!.setValue('goal', 'energy'));
+    act(next);
+    expect(probe.current!.currentPage).toBe(1);
+  });
+
+  test('a page without ownsNavigation keeps the form Continue', () => {
+    register('plain', ({ renderBlocks }) => <>{renderBlocks()}</>);
+    mount(survey('plain'), form);
+    expect(continueButtons()).toEqual(['Form next']);
+  });
+
+  test("an owner that never draws its Continue warns, with a notice in the preview", () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    register('forgetful', ({ renderBlocks }) => <>{renderBlocks()}</>, true);
+    mount(survey('forgetful'), form, { isPreview: true });
+    expect(continueButtons()).toEqual([]);
+    expect(container!.querySelector('[role="alert"]')!.textContent).toContain("doesn't draw its Continue");
+    expect(warn.mock.calls.some(([message]) => String(message).includes('renderNavigation'))).toBe(true);
+    warn.mockRestore();
   });
 });

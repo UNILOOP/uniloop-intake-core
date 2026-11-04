@@ -20,7 +20,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { GripVertical, Plus } from "lucide-react";
 import { ContentBlockItem } from "../blocks/ContentBlockItem";
 import { addPage, isPageItem, moveBlock, removePageKeepingBlocks } from "../helpers/pageItems";
-import { getAllPageLayoutDefinitions } from "../../../renderer/layouts/pageLayouts";
+import { getAllPageLayoutDefinitions, isPageOverrideTarget } from "../../../renderer/layouts/pageLayouts";
 
 // Lazy load ContentBlockPage - only used for pages
 const ContentBlockPage = lazy(() => import("../blocks/ContentBlockPage").then(m => ({ default: m.ContentBlockPage })));
@@ -36,7 +36,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   onUpdate,
   onRemove,
 }) => {
-  const { createNode, state } = useSurveyBuilder();
+  const { createNode, state, pageOverrides } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -253,7 +253,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
 
     const renderPageLayouts = () => (
       <div className="flex flex-col gap-1.5">
-        {getAllPageLayoutDefinitions().map((layout) => (
+        {getAllPageLayoutDefinitions().filter((layout) => !isPageOverrideTarget(layout.name, pageOverrides)).map((layout) => (
           <Button
             type="button"
             key={layout.name}

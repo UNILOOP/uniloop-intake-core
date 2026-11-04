@@ -7,7 +7,7 @@ import { LocalizationEditor } from "./helpers/LocalizationEditor";
 import { v4 as uuidv4 } from "uuid";
 import { BlockLibrary } from "./panels/BlockLibrary";
 import { JsonEditor } from "./helpers/JsonEditor";
-import { BlockDefinition, BlockOverrides, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, PageLayoutDefinition, SurveyMode, EditorMode } from "../../types";
+import { BlockDefinition, BlockOverrides, PageOverrides, GlobalCustomField, LocalizationMap, NodeData, NodeDefinition, ThemeDefinition, LayoutProps, PageLayoutDefinition, SurveyMode, EditorMode } from "../../types";
 import { registerPageLayout } from "../../renderer/layouts/pageLayouts";
 import { SurveyBuilderProvider, useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import { SurveyGraph } from "./SurveyGraph";
@@ -52,6 +52,13 @@ interface SurveyBuilderProps {
    */
   blockOverrides?: BlockOverrides;
   /**
+   * Replaces pages with registered page layouts, keyed by the page name a page
+   * saves, e.g. `{ uniemrIntake: 'ivyIntake' }`. The preview draws the mapped
+   * layout, while the Pages tab and page settings keep offering and saving the
+   * page name. Pass the same mapping to `SurveyForm`.
+   */
+  pageOverrides?: PageOverrides;
+  /**
    * Keys kept outside the form (e.g. patient fields). Navigation, validation and
    * other rule editors list them after block fields, and global custom fields
    * receive them so they can bind blocks to external keys.
@@ -87,6 +94,7 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   editorType = 'full',
   hideBlockLockControls = false,
   blockOverrides,
+  pageOverrides,
   externalFields,
   pageLayoutDefinitions,
 }, ref) => {
@@ -94,7 +102,7 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   useMemo(() => pageLayoutDefinitions?.forEach(registerPageLayout), [pageLayoutDefinitions]);
 
   return (
-    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} mode={mode} externalFields={externalFields}>
+    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} pageOverrides={pageOverrides} mode={mode} externalFields={externalFields}>
       <SurveyBuilderContent
         ref={ref}
         onDataChange={onDataChange}

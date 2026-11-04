@@ -18,7 +18,7 @@ interface ThemePreviewProps {
 }
 
 const ThemePreview: React.FC<ThemePreviewProps> = ({ theme, state, layout, logo = null }) => {
-  const { blockOverrides } = useSurveyBuilder();
+  const { blockOverrides, pageOverrides } = useSurveyBuilder();
   const [surveyThemeMode, setSurveyThemeMode] = useState<ThemeMode>('light');
   const [previewWidth, setPreviewWidth] = useState(400);
 
@@ -123,6 +123,7 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ theme, state, layout, logo 
                 themeMode={surveyThemeMode}
                 customData={state.customData}
                 blockOverrides={blockOverrides}
+                pageOverrides={pageOverrides}
                 logo={logo}
                 progressBar={{
                   type: 'percentage',

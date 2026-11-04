@@ -26,7 +26,7 @@ import { ContentBlockItem } from "./ContentBlockItem";
 import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
-import { getAllPageLayoutDefinitions, getPageLayoutDefinition } from "../../../renderer/layouts/pageLayouts";
+import { getAllPageLayoutDefinitions, getPageLayoutDefinition, isPageOverrideTarget } from "../../../renderer/layouts/pageLayouts";
 import { containsLockedBlock } from "../../../utils/blockLock";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
 
@@ -54,7 +54,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
   moveTargets = [],
   onMoveBlock,
 }) => {
-  const { state } = useSurveyBuilder();
+  const { state, pageOverrides } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   // Removing a hybrid page keeps its blocks, so a locked block doesn't stop it
@@ -182,7 +182,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
                     onChange={handleLayoutChange}
                     className="w-full px-3 py-2 border border-input bg-background text-sm font-normal rounded-md"
                   >
-                    {getAllPageLayoutDefinitions().map((layout) => (
+                    {getAllPageLayoutDefinitions().filter((layout) => !isPageOverrideTarget(layout.name, pageOverrides)).map((layout) => (
                       <option key={layout.name} value={layout.name}>
                         {layout.label || layout.name}
                       </option>

@@ -1648,6 +1648,66 @@ const blockOverrides: BlockOverrides = { yesNoAnswer: 'myYesNo' };
 - Chat and voice layouts show display-only blocks (markdown, HTML, headings, images) as chat text, whatever the mapping.
 - Leave `MyYesNoBlock` out of `blockDefinitions` if it should only appear in place of the built-in block. If you pass it there too, the builder also lists it as a custom block.
 
+### Page Layouts
+
+A page (a `set` node) can name a registered page layout in `pageLayout`. The layout decides where each block of the page goes; values, errors, show/hide rules and Continue stay with the form.
+
+```tsx
+import { registerPageLayout } from 'survey-form-package';
+
+registerPageLayout({
+  name: 'two-column',
+  label: 'Two columns',
+  component: ({ renderBlock, renderBlocks }) => (
+    <div className="grid grid-cols-2 gap-4">
+      <div>{renderBlock('goal')}</div>
+      <div>{renderBlocks()}</div>
+    </div>
+  ),
+});
+```
+
+- `renderBlock(position | fieldName)` draws one visible block; `renderBlocks()` draws the visible blocks not drawn yet. A hidden or already drawn block draws nothing.
+- Pass layouts to `SurveyBuilder` as `pageLayoutDefinitions` to list them in its Pages tab.
+- A page without a registered layout falls back to the form layout's `renderPage`, then to the blocks stacked.
+
+#### A page that draws its own Continue
+
+Set `ownsNavigation: true` and call `renderNavigation()` where the button goes. It takes `NavigationButtons` props, checks the page's answers like the form's own Continue, and turns into Submit on the last step. Back stays with the form layout unless you pass `showPrevious`.
+
+```tsx
+registerPageLayout({
+  name: 'hero',
+  ownsNavigation: true,
+  component: ({ renderBlocks, renderNavigation }) => (
+    <section>
+      {renderBlocks()}
+      {renderNavigation({ nextText: 'See my plan' })}
+    </section>
+  ),
+});
+```
+
+On that page the built-in layouts and `NavigationButtons` leave their own Continue out. A custom form layout that draws its own button can do the same with `usePageOwnsNavigation()`. If the layout never calls `renderNavigation()`, the page has no Continue: the library warns in the console and the builder preview shows a notice.
+
+### Overriding a Page
+
+To draw pages your own way while forms keep the host's page names, register your layout and map the page name to it with `pageOverrides`. Pass the same mapping to `SurveyForm` and `SurveyBuilder`:
+
+```tsx
+import type { PageOverrides } from 'survey-form-package';
+
+// Define the mapping once, so it keeps the same identity between renders.
+const pageOverrides: PageOverrides = { uniemrIntake: 'ivyIntake' };
+
+<SurveyForm survey={surveyData} pageOverrides={pageOverrides} onSubmit={handleSubmit} />
+<SurveyBuilder pageOverrides={pageOverrides} />
+```
+
+- Every page saved with `pageLayout: 'uniemrIntake'` is drawn by `ivyIntake`, in the form and in the builder preview. The form keeps `uniemrIntake`, so removing the mapping brings the system page back.
+- The builder's Pages tab and Layout select offer `uniemrIntake` and hide `ivyIntake`, so new pages save the system name.
+- If `ivyIntake` isn't registered, or throws while rendering, the page draws with the system layout. After a throw, every `uniemrIntake` page uses the system layout, with the form layout's own Continue, until the page reloads or `ivyIntake` is registered again. The throw is logged once.
+
 ### Block Registry Functions
 
 ```tsx

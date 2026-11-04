@@ -217,6 +217,27 @@ describe('page layouts in the builder', () => {
     expect('pageLayout' in saved.items[saved.items.length - 1]).toBe(false);
   });
 
+  test('the Pages tab offers the system page and hides the page that stands in for it', () => {
+    registerPageLayout({ name: 'uniemrIntake', label: 'UniEMR intake', component: ({ renderBlocks }) => <>{renderBlocks()}</> });
+    registerPageLayout({ name: 'ivyIntake', label: 'Ivy intake', component: ({ renderBlocks }) => <>{renderBlocks()}</> });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() =>
+      root!.render(
+        <SurveyBuilderProvider initialData={{ rootNode }} pageOverrides={{ uniemrIntake: 'ivyIntake' }}>
+          <SectionNode data={rootNode} onUpdate={() => {}} onRemove={() => {}} />
+        </SurveyBuilderProvider>
+      )
+    );
+    pressTab('Pages');
+    const labels = [...container!.querySelectorAll('button')].map((button) => button.textContent ?? '');
+    expect(labels.some((label) => label.includes('UniEMR intake'))).toBe(true);
+    expect(labels.some((label) => label.includes('Ivy intake'))).toBe(false);
+    unregisterPageLayout('uniemrIntake');
+    unregisterPageLayout('ivyIntake');
+  });
+
   test('the Edit dialog changes the layout, Stacked clears it, and an unknown name is kept', () => {
     registerPageLayout(twoColumn);
     let saved: BlockData = page;

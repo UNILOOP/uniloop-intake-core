@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.tsx',      // Lightweight renderer entry
     builder: 'src/builder.tsx',  // Heavy builder entry
+    merge: 'src/merge.tsx',      // Diff and merge of two form versions
   },
   format: ['cjs', 'esm'],
   dts: true,

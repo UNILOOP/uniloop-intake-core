@@ -82,3 +82,18 @@ export type {
   ContentBlockItemProps,
   BlockOverrides,
 } from './types';
+
+// Merging two versions of a form (see src/merge.tsx for the full surface)
+export { SurveyMergeView, useSurveyMerge } from './merge';
+export { diffSurveys, applyMergeDecisions, validateMergedSurvey, summarizeDiff, describeSummary, defaultDecisions, bulkDecisions, cascadeDecision, unresolvedConflicts, resolveDecision } from './merge';
+export type {
+  SurveyMergeViewProps,
+  SurveySnapshot,
+  SurveyDiff,
+  MergeHunk,
+  MergeDecisions,
+  MergeIssue,
+  MergeSide,
+  BlockDiffEntry,
+  DiffSummary,
+} from './merge';

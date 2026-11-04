@@ -21,16 +21,16 @@ async function getDagre() {
 // Cache for layout results to avoid redundant calculations
 let layoutCache: {
   key: string;
-  result: { nodes: Node[]; edges: Edge[] };
+  positions: Map<string, Pick<Node, "position" | "targetPosition" | "sourcePosition">>;
 } | null = null;
 
 // Generate a cache key based on node IDs, connections, and sizes
-const generateLayoutCacheKey = (nodes: Node[], edges: Edge[]): string => {
+const generateLayoutCacheKey = (nodes: Node[], edges: Edge[], direction: string): string => {
   const nodeKey = nodes.map(n =>
     `${n.id}:${n.measured?.width ?? defaultWidth}x${n.measured?.height ?? defaultHeight}`
   ).join('|');
-  const edgeKey = edges.map(e => `${e.source}->${e.target}`).join('|');
-  return `${nodeKey}::${edgeKey}`;
+  const edgeKey = edges.map(e => `${e.source}->${e.target}:${e.data?.weight ?? 1}`).join('|');
+  return `${direction}::${nodeKey}::${edgeKey}`;
 };
 
 const NODE_PADDING = 25;
@@ -124,9 +124,16 @@ const adjustNodesForRoutedEdges = (nodes: Node[], edges: Edge[]): Node[] => {
 
 export const getLayoutedElements = async (nodes: Node[], edges: Edge[], direction = "TB") => {
   // Check cache first
-  const cacheKey = generateLayoutCacheKey(nodes, edges);
+  const cacheKey = generateLayoutCacheKey(nodes, edges, direction);
   if (layoutCache && layoutCache.key === cacheKey) {
-    return layoutCache.result;
+    const positions = layoutCache.positions;
+    return {
+      nodes: nodes.map(node => {
+        const geometry = positions.get(node.id)!;
+        return { ...node, ...geometry, position: { ...geometry.position } };
+      }),
+      edges,
+    };
   }
 
   const dagre = await getDagre();
@@ -202,7 +209,14 @@ export const getLayoutedElements = async (nodes: Node[], edges: Edge[], directio
   const result = { nodes: adjustedNodes, edges };
 
   // Cache the result
-  layoutCache = { key: cacheKey, result };
+  // Cache geometry only: different merge columns may share a shape but carry
+  // different wording, decisions, selection and path status.
+  layoutCache = {
+    key: cacheKey,
+    positions: new Map(adjustedNodes.map(node => [node.id, {
+      position: { ...node.position }, targetPosition: node.targetPosition, sourcePosition: node.sourcePosition,
+    }])),
+  };
 
   return result;
 };

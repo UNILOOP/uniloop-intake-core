@@ -9,7 +9,6 @@ import {
   ReactFlowProvider,
   type Node,
   type Edge,
-  MarkerType,
   BackgroundVariant,
   type OnConnect,
   type OnConnectEnd,
@@ -27,6 +26,7 @@ import { useSurveyBuilder } from "../../context/SurveyBuilderContext";
 import { SurveyNode } from "./nodes/SurveyNode";
 import { ButtonEdge } from "./edges/ButtonEdge";
 import { getLayoutedElements } from "./utils/layout";
+import { buildFlowGraph } from "./utils/flowGraph";
 import type { BlockData } from "../../types";
 import { FlowV2Sidebar } from "./FlowV2Sidebar";
 import { FlowV2Toolbar } from "./FlowV2Toolbar";
@@ -34,8 +34,6 @@ import type { FlowV2Mode } from "./types";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import { BlockSelectorDialog } from "./BlockSelectorDialog";
 import { ReplaceBlockDialog } from "../common/ReplaceBlockDialog";
-import { getHumanReadableCondition } from "./utils/conditionLabel";
-import { areAllOptionsCoveredByRules } from "../../utils/conditionalUtils";
 import { Button } from "../../components/ui/button";
 import { BlocksMapProvider } from "./utils/BlocksMapContext";
 import { isBlockLinkLocked, isBlockLocked, isBlockUpdateAllowed } from "../../utils/blockLock";
@@ -150,184 +148,8 @@ const FlowV3BuilderInner: React.FC<FlowV3BuilderProps> = ({ onClose }) => {
   // This only runs when the STRUCTURE changes (not on every text edit)
   const { initialNodes, initialEdges } = useMemo(() => {
     if (!state.rootNode || blocks.length === 0) return { initialNodes: [], initialEdges: [] };
-
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
-
-    // Helper to resolve target - OPTIMIZED: uses Map for O(1) lookup
-    const resolveNavigationTarget = (target: string): string => {
-      if (!target || target === "submit" || target === "end") return "submit";
-      // First try direct UUID lookup (O(1))
-      const targetBlock = blocksMap.get(target);
-      if (targetBlock) return targetBlock.uuid || "";
-      // Fallback to fieldName search if not found by UUID (rare case)
-      const blockByFieldName = blocks.find((b) => b.fieldName === target);
-      return blockByFieldName ? blockByFieldName.uuid || "" : "submit";
-    };
-
-    // --- 1. Create Nodes ---
-
-    // Start Node - Uses emerald green, works well in both light and dark modes
-    nodes.push({
-      id: "start",
-      type: "input",
-      data: { label: "Start Survey" },
-      position: { x: 0, y: 0 },
-      className: 'flow-start-node',
-    });
-
-    // Block Nodes
-    blocks.forEach((block, index) => {
-      nodes.push({
-        id: block.uuid || `block-${index}`,
-        type: "survey-node",
-        data: { block, index },
-        position: { x: 0, y: 0 }, // Layout will set this
-      });
-    });
-
-    // Submit Node - Uses primary color that adapts to dark mode
-    nodes.push({
-      id: "submit",
-      type: "output",
-      data: { label: "Submit / End" },
-      position: { x: 0, y: 0 },
-      className: 'flow-submit-node',
-    });
-
-    // --- 2. Create Edges ---
-
-    if (blocks.length === 0) {
-       edges.push({
-        id: "start-to-submit",
-        source: "start",
-        target: "submit",
-        type: "button-edge", // Use button edge to allow insert
-        data: { insertIndex: 0, weight: 2, edgeType: 'default' },
-        markerEnd: { type: MarkerType.ArrowClosed },
-      });
-    } else {
-      // Start -> First Block
-      const firstBlockId = blocks[0].uuid || "block-0";
-      edges.push({
-        id: "start-to-first",
-        source: "start",
-        target: firstBlockId,
-        type: "button-edge",
-        data: { insertIndex: 0, weight: 2, edgeType: 'start' },
-        markerEnd: { type: MarkerType.ArrowClosed },
-      });
-
-      // Track edges from each source to assign parallel offsets
-      const sourceEdgeCount: Record<string, number> = {};
-
-      // Block Connections
-      blocks.forEach((block, index) => {
-        const blockId = block.uuid || `block-${index}`;
-        const navRules = block.navigationRules || [];
-
-        // Determine target for sequential flow first
-        let nextBlockId = index < blocks.length - 1 ? blocks[index + 1].uuid || `block-${index + 1}` : "submit";
-
-        if (block.nextBlockId) {
-            nextBlockId = block.nextBlockId;
-        }
-
-        if (block.isEndBlock) {
-            nextBlockId = "submit";
-        }
-
-        // Count total edges from this source (for parallel offset calculation)
-        const totalEdgesFromSource = navRules.length +
-          (navRules.some((r) => r.isDefault || !r.condition) ||
-           navRules.some(rule => resolveNavigationTarget(rule.target) === nextBlockId) ? 0 : 1);
-
-        // Explicit Navigation Rules
-        navRules.forEach((rule, ruleIndex) => {
-          const targetId = resolveNavigationTarget(rule.target);
-          if (targetId) {
-            // Check if this rule follows the sequential path
-            const isSequentialPath = targetId === nextBlockId;
-
-            // Track edge index from this source for parallel offset
-            const edgeIndexFromSource = sourceEdgeCount[blockId] || 0;
-            sourceEdgeCount[blockId] = edgeIndexFromSource + 1;
-
-            edges.push({
-              id: `${blockId}-nav-${ruleIndex}`,
-              source: blockId,
-              target: targetId,
-              // Use human readable label
-              label: rule.isDefault ? "Default" : getHumanReadableCondition(rule.condition, blocks, state.definitions.blocks),
-              // ALWAYS use button-edge to show labels/delete buttons
-              type: "button-edge",
-              animated: !rule.isDefault,
-              markerEnd: { type: MarkerType.ArrowClosed },
-              data: {
-                  rule,
-                  ruleIndex, // Include rule index for editing
-                  // ALWAYS provide insertIndex to allow insertion
-                  insertIndex: index + 1,
-                  targetBlockId: targetId,
-                  sourceBlockId: blockId,
-                  weight: isSequentialPath ? 2 : 1, // Give higher weight to sequential path
-                  // Parallel edge info for offset calculation
-                  edgeIndex: edgeIndexFromSource,
-                  totalParallelEdges: totalEdgesFromSource,
-                  // Edge type for styling
-                  edgeType: rule.isDefault ? 'default' : 'conditional',
-              }
-            });
-          }
-        });
-
-        // Implicit Sequential Fallback
-        const hasDefaultRule = navRules.some((r) => r.isDefault || !r.condition);
-
-        // Check if we already have a rule pointing to the next block
-        const hasRuleToNextBlock = navRules.some(rule => {
-             const targetId = resolveNavigationTarget(rule.target);
-             return targetId === nextBlockId;
-        });
-
-        // Check if all options are covered by navigation rules pointing to non-sequential targets
-        // If so, we don't need a fallback edge because every possible selection has a defined path
-        const allOptionsCovered = areAllOptionsCoveredByRules(
-          block,
-          nextBlockId,
-          state.definitions.blocks[block.type]
-        );
-
-        if (!hasDefaultRule && !hasRuleToNextBlock && !allOptionsCovered) {
-           // Track edge index from this source for parallel offset
-           const edgeIndexFromSource = sourceEdgeCount[blockId] || 0;
-           sourceEdgeCount[blockId] = edgeIndexFromSource + 1;
-
-           edges.push({
-            id: `${blockId}-seq-${nextBlockId}`,
-            source: blockId,
-            target: nextBlockId,
-            type: "button-edge", // Allow insert on sequential edges
-            data: {
-                insertIndex: index + 1,
-                targetBlockId: nextBlockId,
-                sourceBlockId: blockId,
-                weight: 2,
-                // Parallel edge info for offset calculation
-                edgeIndex: edgeIndexFromSource,
-                totalParallelEdges: totalEdgesFromSource,
-                // Edge type for styling
-                edgeType: 'sequential',
-            },
-            animated: false,
-            // No "Else" label
-            markerEnd: { type: MarkerType.ArrowClosed },
-          });
-        }
-      });
-    }
-
-    return { initialNodes: nodes, initialEdges: edges };
+    const graph = buildFlowGraph(blocks, state.definitions.blocks);
+    return { initialNodes: graph.nodes, initialEdges: graph.edges };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralKey, blocks, blocksMap, state.definitions.blocks]); // Only recompute when structure actually changes
 

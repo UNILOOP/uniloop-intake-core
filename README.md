@@ -45,6 +45,30 @@ A powerful, customizable React intake form renderer and builder library with Typ
 - **Extensible**: Register custom blocks and layouts at runtime
 - **Resume/Save**: Restore partially completed forms with `initialValues`, `startPage`, and navigation history
 
+## Merging two versions of a form
+
+`src/merge` compares two versions of a form and builds a third from them, for hosts that pull form templates from somewhere else and let people edit the copies. It knows nothing about where the versions come from.
+
+```tsx
+import { SurveyMergeView, diffSurveys, applyMergeDecisions, validateMergedSurvey } from '@/packages/survey-form-package/src/merge';
+
+// Engine only (no React)
+const diff = diffSurveys(current, incoming, { base, definitions });   // base: the version both started from, when known
+const merged = applyMergeDecisions(diff, { 'blockUuid:key:label': 'incoming' });
+const issues = validateMergedSurvey(merged, { incoming, definitions });
+
+// Full screen: the two flows side by side (rows aligned, result as an optional third column),
+// a merged flow with every change marked, a review list with Keep/Use on each change, a preview
+<SurveyMergeView current={current} incoming={incoming} base={base} blockDefinitions={blocks} labels={{ current: 'your form', incoming: 'provider update' }} onApply={(merged) => save(merged)} />
+```
+
+- Blocks match by `uuid`, then by `fieldName` (pages by name), so a block keeps its identity and saved answers when the other side recreated it.
+- Every difference is a hunk with a category: text, options, paths, validation, visibility, identity, A/B test, lock, order, placement, settings, translations, theme. Paths and validation rules are diffed rule by rule.
+- With a `base`, each hunk knows who changed it: the incoming side is taken by default, the current side is kept, and a change on both sides is a conflict that keeps the current side until decided. Without a base every difference keeps the current side unless taken.
+- Provider-locked blocks (`locked: true` on the incoming block) always follow the incoming side on the paths their definition's `lockAccess` locks; a block without `lockAccess` is locked as a whole.
+- `decisions` can be controlled, so a host can keep one set per version while switching between them.
+- The side-by-side view (`initialTab="compare"`, the default) draws the current form on the left and the incoming one on the right, one row per block, with dashed placeholders where a column has no such block, and "Show result after applying" adds a third column that updates with every decision. Paths that differ are coloured and labelled with the question they depend on; unchanged conditional paths are faint. Clicking a block lights up every path in and out of it, clicking a path or its label singles it out in every column, and clicking empty canvas clears the highlight.
+
 ## Installation
 
 This package is not published to npm. Add it to your project as a **git submodule** or copy it as a **local package**.

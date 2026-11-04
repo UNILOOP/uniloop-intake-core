@@ -92,14 +92,14 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
             </Badge>
           )}
           {locked && (
-            <Badge variant="secondary" className="gap-1" title={groupNote ?? undefined}>
-              <Lock className="h-3 w-3" />
+            <Badge variant="secondary" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Lock className="h-3 w-3 shrink-0" />
               {groupRole === "root" || groupRole === "member" ? "Path locked" : "Locked"}
             </Badge>
           )}
           {groupRole === "orderFixed" && (
-            <Badge variant="outline" className="gap-1" title={groupNote ?? undefined}>
-              <Pin className="h-3 w-3" />
+            <Badge variant="outline" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Pin className="h-3 w-3 shrink-0" />
               Position fixed
             </Badge>
           )}
@@ -114,7 +114,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                 Edit
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl w-4xl overflow-y-scroll max-h-screen">
+            <DialogContent className="max-w-4xl overflow-y-scroll max-h-screen">
               <DialogHeader>
                 <DialogTitle>Edit {blockDefinition.name}</DialogTitle>
               </DialogHeader>

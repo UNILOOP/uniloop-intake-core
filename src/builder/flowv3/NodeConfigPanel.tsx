@@ -275,7 +275,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-4xl overflow-y-scroll max-h-screen">
+      <DialogContent className="max-w-4xl overflow-y-scroll max-h-screen">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-muted-foreground" />

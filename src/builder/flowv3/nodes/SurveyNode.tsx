@@ -128,14 +128,14 @@ const SurveyNodeInner = ({ id, data, selected }: NodeProps<Node<FlowV3NodeData>>
             </Badge>
           )}
           {locked && (
-            <Badge variant="secondary" className="gap-1" title={groupNote ?? undefined}>
-              <Lock className="h-3 w-3" />
+            <Badge variant="secondary" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Lock className="h-3 w-3 shrink-0" />
               {groupRole === "root" || groupRole === "member" ? "Path locked" : "Locked"}
             </Badge>
           )}
           {groupRole === "orderFixed" && (
-            <Badge variant="outline" className="gap-1" title={groupNote ?? undefined}>
-              <Pin className="h-3 w-3" />
+            <Badge variant="outline" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Pin className="h-3 w-3 shrink-0" />
               Position fixed
             </Badge>
           )}

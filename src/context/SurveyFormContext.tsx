@@ -9,7 +9,7 @@ import type {
   CustomValidator,
   BranchingLogic
 } from "../types";
-import { getSurveyPages, getSurveyPageIds, evaluateLogic, detectSurveyMode } from "../utils/surveyUtils";
+import { getSurveyPages, getSurveyPageIds, evaluateLogic, detectSurveyMode, isPageNode } from "../utils/surveyUtils";
 import type { BlockOverrides, SurveyMode } from "../types";
 import { validationRuleToFunction } from "../builder/common/validation-rules-types";
 import {
@@ -18,7 +18,8 @@ import {
   executeCalculation,
   getNextPageIndex as calculateNextPageIndex,
   getNextPageFromNavigationRules,
-  getNextStepFromNavigationRules
+  getNextStepFromNavigationRules,
+  findStepPosition
 } from "../utils/conditionalUtils";
 import { ThemeDefinition, themes } from "../themes";
 import { resolveBlockDefinition } from "../blocks";
@@ -145,7 +146,18 @@ interface SurveyFormProviderProps {
   mode?: SurveyMode;
   /** Values kept outside the form, and how blocks are bound to them */
   external?: ExternalConfig;
+  /**
+   * Asks a page's blocks one at a time, as separate steps, instead of together.
+   * For layouts that ask one question per turn, like chat and voice.
+   */
+  flattenPages?: boolean;
 }
+
+type StepPosition = { pageIndex: number; blockIndex: number };
+/** Where Continue leads from a step, and which rule decided it */
+type NextStep =
+  | { kind: 'submit' }
+  | { kind: 'rule' | 'nextBlock' | 'nextPage'; position: StepPosition };
 
 // Provider component
 export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
@@ -172,6 +184,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   blockOverrides,
   mode,
   external,
+  flattenPages = false,
 }) => {
   // Debug log for resume functionality
   if(debug)
@@ -188,9 +201,17 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
   // Get all pages from the survey - must be before state initialization
   // In pageless mode, each block becomes its own "page"
-  const pages = getSurveyPages(surveyData.rootNode, surveyMode);
-  const pageIds = getSurveyPageIds(surveyData.rootNode, surveyMode);
+  // A root set in a pageless form is a page: one step that shows all of its blocks
+  const pagesOptions = { groupPages: !flattenPages };
+  const pages = getSurveyPages(surveyData.rootNode, surveyMode, pagesOptions);
+  const pageIds = getSurveyPageIds(surveyData.rootNode, surveyMode, pagesOptions);
   const totalPages = Math.max(1, pages.length);
+  // The set behind each page step; undefined for a single-block step
+  const pageNodes: Array<BlockData | undefined> = pageIds.map(id =>
+    surveyMode === 'pageless' && !flattenPages
+      ? surveyData.rootNode.items?.find(item => item.uuid === id && isPageNode(item))
+      : undefined
+  );
 
   if (debug) {
     console.log('[SurveyFormProvider] Survey mode:', surveyMode);
@@ -476,10 +497,33 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     });
   }
 
+  // Rule context for a set of answers (external values under, computed values over)
+  const ruleContextFor = (formValues: Record<string, any>) =>
+    ({ ...externalRuleContext, ...formValues, ...computedValues });
+
+  // Blocks a step shows: a page's visible blocks, or the step's block if it's visible
+  const getStepBlocks = (pageIndex: number, blockIndex: number, formValues: Record<string, any>): BlockData[] => {
+    const context = ruleContextFor(formValues);
+    if (pageNodes[pageIndex]) {
+      return (pages[pageIndex] || []).filter(block => isBlockVisible(block, context));
+    }
+    const block = (pages[pageIndex] || [])[blockIndex];
+    return block && isBlockVisible(block, context) ? [block] : [];
+  };
+
+  // A step with nothing visible is passed over (reads the latest answers)
+  const isStepHidden = (pageIndex: number, blockIndex: number): boolean => {
+    if (!pageNodes[pageIndex] && !(pages[pageIndex] || [])[blockIndex]) return false;
+    return getStepBlocks(pageIndex, blockIndex, valuesRef.current).length === 0;
+  };
+
   // Helper function to check if a block should be skipped when navigating back
   const shouldSkipBlockOnBack = useCallback((pageUuid: string, blockUuid?: string): boolean => {
     const pageIndex = getPageIndexByUuid(pageUuid);
     if (pageIndex < 0 || pageIndex >= pages.length) return false;
+
+    // Hidden steps are passed over going forward, so going back too
+    if (pageNodes[pageIndex]) return isStepHidden(pageIndex, 0);
 
     if (!blockUuid) return false;
 
@@ -488,6 +532,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
     // A block the host skips going forward is stepped over going back too
     if (isBlockSkippedByExternal(block)) return true;
+    if (block && isStepHidden(pageIndex, pageBlocks.indexOf(block))) return true;
 
     if (!block || block.type !== 'auth') return false;
 
@@ -501,7 +546,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     // return !!existingToken;
 
     return false; // Simplified for this example
-  }, [pages, getPageIndexByUuid, isBlockSkippedByExternal]);
+  }, [pages, pageNodes, getPageIndexByUuid, isBlockSkippedByExternal]);
 
   // Helper function to find the previous non-skippable block
   const findPreviousNonSkippableBlock = useCallback((
@@ -630,7 +675,8 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     trigger: NavigationHistoryEntry['trigger']
   ) => {
     const pageUuid = getPageUuidByIndex(pageIndex);
-    const blockUuid = getBlockUuidByIndex(pageIndex, blockIndex);
+    // A page is one step, so its entry names no block
+    const blockUuid = pageNodes[pageIndex] ? null : getBlockUuidByIndex(pageIndex, blockIndex);
 
     if (!pageUuid) {
       console.warn('[Navigation] Cannot add to history: invalid page index', pageIndex);
@@ -649,7 +695,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       const lastEntry = prev[prev.length - 1];
       if (lastEntry &&
           lastEntry.pageUuid === pageUuid &&
-          lastEntry.blockUuid === blockUuid) {
+          (lastEntry.blockUuid ?? null) === blockUuid) {
         return prev;
       }
 
@@ -670,75 +716,71 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         window.location.href
       );
     }
-  }, [getPageUuidByIndex, getBlockUuidByIndex]);
+  }, [getPageUuidByIndex, getBlockUuidByIndex, pageNodes]);
 
   // Get visible blocks for current state
   const getVisibleBlocks = useCallback((blocks: BlockData[]): BlockData[] => {
-    return blocks.filter(block => {
-      if (!block.visibleIf) return true;
-      return isBlockVisible(block, { ...externalRuleContext, ...values, ...computedValues });
-    });
+    const context = { ...externalRuleContext, ...values, ...computedValues };
+    return blocks.filter(block => isBlockVisible(block, context));
   }, [externalRuleContext, values, computedValues]);
 
   // Find the longest path from start to submit/end using memoized DP (O(n))
-  // Each block is computed once and cached — no exponential backtracking
+  // Each step (a block, or a whole page) is computed once and cached — no exponential backtracking
   const getLongestPathLength = useCallback((): number => {
-    const allBlocks = pages.flat();
-    if (allBlocks.length === 0) return 0;
+    if (pages.flat().length === 0) return 0;
 
-    const blockByUuid = new Map(allBlocks.map(b => [b.uuid, b]));
     const memo = new Map<string, number>();
     const inStack = new Set<string>(); // cycle detection
+    const normalize = (position: StepPosition): StepPosition =>
+      pageNodes[position.pageIndex] ? { pageIndex: position.pageIndex, blockIndex: 0 } : position;
 
-    const dfs = (block: BlockData): number => {
-      if (!block.uuid) return 1;
-      if (memo.has(block.uuid)) return memo.get(block.uuid)!;
-      if (inStack.has(block.uuid)) return 0; // cycle — stop
+    const dfs = ({ pageIndex, blockIndex }: StepPosition): number => {
+      const key = `${pageIndex}:${blockIndex}`;
+      if (memo.has(key)) return memo.get(key)!;
+      if (inStack.has(key)) return 0; // cycle — stop
 
-      if (block.isEndBlock || block.nextBlockId === 'submit') {
-        memo.set(block.uuid, 1);
+      // A page routes with its own rules; a single block with its own
+      const pageNode = pageNodes[pageIndex];
+      const node = pageNode ?? (pages[pageIndex] || [])[blockIndex];
+      if (!node) return 0;
+      if (node.isEndBlock || node.nextBlockId === 'submit') {
+        memo.set(key, 1);
         return 1;
       }
 
-      inStack.add(block.uuid);
-      const idx = allBlocks.findIndex(b => b.uuid === block.uuid);
-      let maxChild = 0;
-
+      inStack.add(key);
       // Collect all possible successors
-      const nextUuids = new Set<string>();
-
-      if (block.nextBlockId && block.nextBlockId !== 'submit') {
-        nextUuids.add(block.nextBlockId);
+      const targets = new Set<string>();
+      if (node.nextBlockId) targets.add(node.nextBlockId);
+      for (const rule of node.navigationRules || []) {
+        if (rule.target && rule.target !== 'submit') targets.add(String(rule.target));
       }
-
-      if (block.navigationRules) {
-        for (const rule of block.navigationRules) {
-          if (rule.target && rule.target !== 'submit') {
-            nextUuids.add(rule.target);
-          }
+      const successors: StepPosition[] = [];
+      for (const target of targets) {
+        const position = findStepPosition(pages, pageIds, target);
+        if (position) successors.push(normalize(position));
+      }
+      if (!node.nextBlockId) {
+        if (!pageNode && blockIndex < (pages[pageIndex] || []).length - 1) {
+          successors.push({ pageIndex, blockIndex: blockIndex + 1 });
+        } else if (pageIndex < pages.length - 1) {
+          successors.push({ pageIndex: pageIndex + 1, blockIndex: 0 });
         }
       }
 
-      if (!block.nextBlockId && idx >= 0 && idx < allBlocks.length - 1) {
-        const seqNext = allBlocks[idx + 1];
-        if (seqNext.uuid) nextUuids.add(seqNext.uuid);
+      let maxChild = 0;
+      for (const successor of successors) {
+        maxChild = Math.max(maxChild, dfs(successor));
       }
 
-      for (const uuid of nextUuids) {
-        const nextBlock = blockByUuid.get(uuid);
-        if (nextBlock) {
-          maxChild = Math.max(maxChild, dfs(nextBlock));
-        }
-      }
-
-      inStack.delete(block.uuid);
+      inStack.delete(key);
       const result = 1 + maxChild;
-      memo.set(block.uuid, result);
+      memo.set(key, result);
       return result;
     };
 
-    return dfs(allBlocks[0]);
-  }, [pages]);
+    return dfs({ pageIndex: 0, blockIndex: 0 });
+  }, [pages, pageIds, pageNodes]);
 
   // Total steps = longest possible path through the survey
   const getTotalVisibleSteps = useCallback((): number => {
@@ -797,7 +839,10 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     return evaluateCondition(condition, contextValues);
   }, [externalRuleContext, values, computedValues]);
 
-  const getNextPageIndex = useCallback((): number | null => {
+  const getNextPageIndexFrom = (
+    currentPage: number,
+    context: Record<string, any> = { ...externalRuleContext, ...values, ...computedValues }
+  ): number | null => {
     const currentPageBlocks = pages[currentPage] || [];
     let branchingLogic: BranchingLogic | undefined;
 
@@ -822,7 +867,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       const nextIndex = calculateNextPageIndex(
         currentPage,
         branchingLogic,
-        { ...externalRuleContext, ...values, ...computedValues },
+        context,
         totalPages
       );
 
@@ -837,14 +882,54 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       currentPageBlocks,
       pages,
       pageIds,
-      { ...externalRuleContext, ...values, ...computedValues }
+      context
     );
     if (navIndex !== null) {
       return navIndex === -1 ? null : navIndex;
     }
 
     return currentPage + 1 < totalPages ? currentPage + 1 : null;
-  }, [currentPage, pages, totalPages, externalRuleContext, values, computedValues]);
+  };
+  const getNextPageIndex = (): number | null => getNextPageIndexFrom(currentPage);
+
+  // Where Continue leads from a step, given a set of answers
+  const resolveNextStep = (pageIndex: number, blockIndex: number, formValues: Record<string, any>): NextStep => {
+    const context = ruleContextFor(formValues);
+    const toStep = (position: StepPosition): StepPosition =>
+      pageNodes[position.pageIndex] ? { pageIndex: position.pageIndex, blockIndex: 0 } : position;
+
+    // A page leaves through its own rules; rules on blocks inside it aren't used
+    const pageNode = pageNodes[pageIndex];
+    if (pageNode) {
+      const visible = getStepBlocks(pageIndex, 0, formValues);
+      if (pageNode.isEndBlock || visible.some(block => block.isEndBlock)) return { kind: 'submit' };
+      const target = getNextStepFromNavigationRules(pageNode, pages, pageIds, context);
+      if (target === 'submit') return { kind: 'submit' };
+      if (target) return { kind: 'rule', position: toStep(target) };
+      return pageIndex + 1 < totalPages
+        ? { kind: 'nextPage', position: { pageIndex: pageIndex + 1, blockIndex: 0 } }
+        : { kind: 'submit' };
+    }
+
+    const pageBlocks = pages[pageIndex] || [];
+    const block = pageBlocks[blockIndex];
+    if (block?.isEndBlock) return { kind: 'submit' };
+
+    // A hidden block is passed over: its answer-based rules don't apply
+    const routing = block && !isBlockVisible(block, context) ? { ...block, navigationRules: undefined } : block;
+    const target = routing ? getNextStepFromNavigationRules(routing, pages, pageIds, context) : null;
+    if (target === 'submit') return { kind: 'submit' };
+    if (target) return { kind: 'rule', position: toStep(target) };
+
+    if (blockIndex < pageBlocks.length - 1) {
+      return { kind: 'nextBlock', position: { pageIndex, blockIndex: blockIndex + 1 } };
+    }
+
+    const nextIndex = getNextPageIndexFrom(pageIndex, context);
+    return nextIndex === null
+      ? { kind: 'submit' }
+      : { kind: 'nextPage', position: { pageIndex: nextIndex, blockIndex: 0 } };
+  };
 
   const validateField = useCallback((
     fieldName: string,
@@ -935,8 +1020,10 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   // Check if entire current page is valid (for page-by-page layout)
   const isCurrentPageValid = currentPageFields.every(field => !errors[field] && !conditionalErrors[field]);
   
-  // Use block-level validation for steppers, page-level for others
-  const isValid = isCurrentBlockValid;
+  // Use block-level validation for steppers, page-level for pages
+  const isPageStep = !!pageNodes[currentPage];
+  const isValid = isPageStep ? isCurrentPageValid : isCurrentBlockValid;
+  const currentStepBlocks = getStepBlocks(currentPage, currentBlockIndex, values);
 
   // Enhanced setValue
   const setValue = (field: string, value: any) => {
@@ -1024,23 +1111,32 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const goToNextBlock = (fValue?: Record<string, any>) => {
     navigationDirectionRef.current = 'forward';
     const pageBlocks = pages[currentPage] || [];
-    const currentBlock = pageBlocks[currentBlockIndex];
+    // A page answers all of its blocks at once; otherwise the step is one block
+    const answeredBlocks = isPageStep ? pageBlocks : [pageBlocks[currentBlockIndex]];
 
-    // The block's mapped output keys come from its answer, so navigation rules on
+    // A block's mapped output keys come from its answer, so navigation rules on
     // them see this answer too
-    const answer = fValue ? { ...values, ...fValue }[currentBlock?.fieldName ?? ''] : undefined;
-    const update = fValue ? { ...fValue, ...expandBlockValue(currentBlock, answer) } : undefined;
+    const answers = fValue ? { ...values, ...fValue } : values;
+    const update = fValue
+      ? answeredBlocks.reduce<Record<string, any>>(
+          (acc, block) => block?.fieldName && block.fieldName in fValue
+            ? { ...acc, ...expandBlockValue(block, answers[block.fieldName]) }
+            : acc,
+          { ...fValue }
+        )
+      : undefined;
     const mergedValues = update ? { ...values, ...update } : values;
 
     if (update) {
       setValues(prev => ({ ...prev, ...update }));
     }
 
-    // Validate the current fields against the values being submitted before any
-    // navigation or submission. Auto-continue calls this synchronously right after
-    // the selection, so the `values` render snapshot may not include the new
-    // answer yet; `mergedValues` always does.
-    const fieldNames = getBlockFieldNames(currentBlock);
+    // Validate the step's visible fields against the values being submitted before
+    // any navigation or submission. Auto-continue calls this synchronously right
+    // after the selection, so the `values` render snapshot may not include the new
+    // answer yet; `mergedValues` always does. A hidden block isn't checked.
+    const fieldNames = getStepBlocks(currentPage, currentBlockIndex, mergedValues)
+      .flatMap(block => getBlockFieldNames(block));
     if (fieldNames.length > 0) {
       const validationErrors = fieldNames.map(name =>
         [name, validateField(name, mergedValues[name], mergedValues)] as const
@@ -1060,49 +1156,34 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       }
     }
 
-    if (currentBlock?.isEndBlock) {
+    const next = resolveNextStep(currentPage, currentBlockIndex, mergedValues);
+
+    if (next.kind === 'submit') {
+      // Pass the merged values to submit to avoid race conditions
       submit(mergedValues);
       return;
     }
 
-    const target = getNextStepFromNavigationRules(
-      currentBlock,
-      pages,
-      pageIds,
-      { ...externalRuleContext, ...mergedValues, ...computedValues }
-    );
+    const { pageIndex, blockIndex } = next.position;
+    if (next.kind === 'rule') {
+      addToNavigationHistory(pageIndex, blockIndex, 'forward');
+      setCurrentPage(pageIndex);
+      setCurrentBlockIndex(blockIndex);
 
-    if (target === 'submit') {
-      submit(mergedValues);
-      return;
-    }
-
-    if (target) {
-      addToNavigationHistory(target.pageIndex, target.blockIndex, 'forward');
-      setCurrentPage(target.pageIndex);
-      setCurrentBlockIndex(target.blockIndex);
-      
       if (onPageChange) {
-        onPageChange(target.pageIndex, totalPages);
+        onPageChange(pageIndex, totalPages);
       }
       return;
     }
 
-    if (currentBlockIndex < pageBlocks.length - 1) {
-      const newBlockIndex = currentBlockIndex + 1;
-      addToNavigationHistory(currentPage, newBlockIndex, 'forward');
-      setCurrentBlockIndex(newBlockIndex);
+    if (next.kind === 'nextBlock') {
+      addToNavigationHistory(pageIndex, blockIndex, 'forward');
+      setCurrentBlockIndex(blockIndex);
       return;
     }
 
-    const nextIndex = getNextPageIndex();
-    if (nextIndex === null) {
-      // Pass the merged values to submit to avoid race conditions
-      submit(mergedValues);
-    } else {
-      addToNavigationHistory(nextIndex, 0, 'forward');
-      goToPage(nextIndex);
-    }
+    addToNavigationHistory(pageIndex, 0, 'forward');
+    goToPage(pageIndex);
   };
 
   // Enhanced goToPreviousBlock that works with browser back button
@@ -1142,6 +1223,50 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     goToPreviousBlock();
   };
 
+  /**
+   * Drops answers of blocks the final answers don't lead through: blocks on a
+   * branch the patient backed out of, and blocks hidden on the way. Replays the
+   * routing from the first step rather than reading the history, which a resume
+   * rebuilds as every step up to the start page. Keys no block saves (external or
+   * computed values) stay. If the replay doesn't reach submit through the current
+   * step, nothing is dropped.
+   */
+  const keepFinalPathAnswers = (formValues: Record<string, any>): Record<string, any> => {
+    const onPath = new Set<BlockData>();
+    const seen = new Set<string>();
+    let position: StepPosition = { pageIndex: 0, blockIndex: 0 };
+    let reachedSubmit = false;
+    let passedCurrentStep = false;
+
+    while (!seen.has(`${position.pageIndex}:${position.blockIndex}`)) {
+      seen.add(`${position.pageIndex}:${position.blockIndex}`);
+      if (position.pageIndex === currentPage && (isPageStep || position.blockIndex === currentBlockIndex)) {
+        passedCurrentStep = true;
+      }
+      for (const block of getStepBlocks(position.pageIndex, position.blockIndex, formValues)) {
+        onPath.add(block);
+      }
+      const next = resolveNextStep(position.pageIndex, position.blockIndex, formValues);
+      if (next.kind === 'submit') {
+        reachedSubmit = true;
+        break;
+      }
+      position = next.position;
+    }
+
+    if (!reachedSubmit || !passedCurrentStep) return formValues;
+
+    const kept = new Set([...onPath].flatMap(block => getBlockFieldNames(block)));
+    const dropped = new Set(
+      pages.flat()
+        .filter(block => !onPath.has(block))
+        .flatMap(block => getBlockFieldNames(block))
+        .filter(field => !kept.has(field))
+    );
+    if (dropped.size === 0) return formValues;
+    return Object.fromEntries(Object.entries(formValues).filter(([field]) => !dropped.has(field)));
+  };
+
   // Submit function
   const submit = async (overrideValues?: Record<string, any>) => {
     setIsSubmitting(true);
@@ -1153,8 +1278,9 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       .filter(block => block.fieldName)
       .map(block => block.fieldName as string);
 
-    // Use override values if provided, otherwise use state values
-    const finalValues = overrideValues || values;
+    // Use override values if provided, otherwise use state values. Only the
+    // answers on the path those values lead through are sent.
+    const finalValues = keepFinalPathAnswers(overrideValues || values);
 
     // const newConditionalErrors: Record<string, string> = {};
 
@@ -1197,8 +1323,11 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     if (skipCheckedArrivalRef.current === key) return;
     skipCheckedArrivalRef.current = key;
     if (navigationDirectionRef.current === 'back' || isSubmitting) return;
-    if (isBlockSkippedByExternal(arrivalBlock)) {
+    if (!isPageStep && isBlockSkippedByExternal(arrivalBlock)) {
       if (enableDebug) console.log('[SurveyFormContext] Skipping block filled from external values:', arrivalBlock?.uuid);
+      goToNextBlock();
+    } else if (isStepHidden(currentPage, currentBlockIndex)) {
+      if (enableDebug) console.log('[SurveyFormContext] Skipping hidden step:', currentPage, currentBlockIndex);
       goToNextBlock();
     }
   };
@@ -1254,6 +1383,10 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         blockOverrides,
         externalValues,
         setExternalValues,
+        pages,
+        isPageStep,
+        currentPageNode: pageNodes[currentPage],
+        currentStepBlocks,
       }}
     >
       {children}

@@ -430,3 +430,33 @@ test('declining a new section preserves existing block placement and suppresses 
   const diff = diffSurveys(current, incoming, { base: current });
   expect(applyMergeDecisions(diff, { 'section:new:add': 'current' })).toEqual(current);
 });
+
+describe('pages with show/hide rules', () => {
+  const showIfSmoker = { initial: 'hidden' as const, conditions: ['smoker == "yes"'] };
+
+  test('a show/hide rule set upstream on a page block is a visibility change that is taken', () => {
+    const base = survey([radio('a', 'smoker'), page('p1', 'Habits', [radio('b', 'packs'), radio('c', 'years')])]);
+    const incoming = survey([
+      radio('a', 'smoker'),
+      page('p1', 'Habits', [radio('b', 'packs', { visibility: showIfSmoker }), radio('c', 'years')]),
+    ]);
+    const diff = diffSurveys(structuredClone(base), incoming, { base });
+    expect(hunk(diff, 'b:key:visibility')).toMatchObject({ category: 'visibility', origin: 'incoming', defaultDecision: 'incoming' });
+    const merged = applyMergeDecisions(diff);
+    expect(items(merged)[1].items?.[0].visibility).toEqual(showIfSmoker);
+    expect(validateMergedSurvey(merged, { incoming })).toEqual([]);
+  });
+
+  test('a block moved from the root into a page keeps its show/hide rule', () => {
+    const base = survey([radio('a', 'smoker'), radio('b', 'packs', { visibility: showIfSmoker }), page('p1', 'Habits', [radio('c', 'years')])]);
+    const incoming = survey([radio('a', 'smoker'), page('p1', 'Habits', [radio('b', 'packs', { visibility: showIfSmoker }), radio('c', 'years')])]);
+    const diff = diffSurveys(structuredClone(base), incoming, { base });
+    expect(hunk(diff, 'b:placement')).toMatchObject({ category: 'placement', defaultDecision: 'incoming' });
+    const merged = applyMergeDecisions(diff);
+    expect(keys(merged)).toEqual(['a', 'p1']);
+    expect(items(merged)[1].items?.map((block) => [block.uuid, block.visibility])).toEqual([
+      ['b', showIfSmoker],
+      ['c', undefined],
+    ]);
+  });
+});

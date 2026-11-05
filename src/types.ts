@@ -648,6 +648,14 @@ export interface SurveyFormContextProps {
   };
   customData?: any;
   blockOverrides?: BlockOverrides;
+  /** Steps of the form: one block each, or every block of a page */
+  pages?: Array<BlockData[]>;
+  /** Whether the current step is a page, which shows its visible blocks together */
+  isPageStep?: boolean;
+  /** The set behind the current page step, with the page's own navigation */
+  currentPageNode?: BlockData;
+  /** Blocks the current step draws: the visible blocks of a page, or the current block */
+  currentStepBlocks?: BlockData[];
 }
 
 // New interfaces for conditional branching and validation
@@ -772,6 +780,8 @@ export interface BlockData {
   navigationRules?: NavigationRule[];
   validationRules?: ValidationRule[];
   visibleIf?: any;
+  /** Shows or hides the block as answers change; a hidden block outside a page is skipped */
+  visibility?: BlockVisibility;
   isEndBlock?: boolean;
   /** Whether isEndBlock was manually set by the user (prevents auto-clearing) */
   isEndBlockManual?: boolean;
@@ -806,6 +816,18 @@ export interface BlockData {
    */
   outputFields?: Record<string, OutputFieldMapping>;
   [key: string]: any;
+}
+
+/**
+ * When a block shows. `hidden` starts hidden and shows once the conditions
+ * match; `visible` starts shown and hides once they match. Conditions use the
+ * same expressions as navigation rules.
+ */
+export interface BlockVisibility {
+  initial: 'hidden' | 'visible';
+  conditions: string[];
+  /** Whether every condition has to match, or any one (default `all`) */
+  match?: 'all' | 'any';
 }
 
 /** Where one output key of a block is saved, and the question it answers */

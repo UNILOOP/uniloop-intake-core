@@ -1,6 +1,7 @@
 import type { BlockData, NavigationRule, ValidationRule } from '../types';
 import { getBlockFieldNames } from '../utils/blockFields';
 import { findDuplicateFieldNames } from '../utils/duplicateFieldNames';
+import { findPathGroupChanges } from '../utils/pathGroupLock';
 import { collectSurvey } from './collect';
 import { blockTitle, type Definitions } from './describe';
 import type { MergeIssue, SurveySnapshot } from './types';
@@ -88,6 +89,14 @@ export function validateMergedSurvey(
       if (changed) {
         issues.push({ level: 'error', code: 'locked-changed', message: `Provider-locked block "${title}" must keep its incoming ${changed}.`, blockKey: location.key });
       }
+    }
+
+    const groups = findPathGroupChanges(options.incoming.rootNode, merged.rootNode);
+    for (const block of groups.changed) {
+      issues.push({ level: 'error', code: 'path-group-changed', message: `"${blockTitle(block, definitions)}" must stay in its incoming locked path.`, blockKey: block.uuid });
+    }
+    if (groups.separated) {
+      issues.push({ level: 'error', code: 'path-group-order', message: 'A locked path must keep its blocks together and in their incoming order.' });
     }
   }
 

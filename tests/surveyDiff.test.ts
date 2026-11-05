@@ -11,6 +11,7 @@ import {
   validateMergedSurvey,
 } from '../src/merge';
 import type { SurveySnapshot } from '../src/merge';
+import { lockPathGroup } from '../src/utils/pathGroupLock';
 import type { BlockData, BlockDefinition, ThemeDefinition } from '../src/types';
 
 const radio = (uuid: string, fieldName: string, extra: Partial<BlockData> = {}): BlockData => ({
@@ -429,4 +430,48 @@ test('declining a new section preserves existing block placement and suppresses 
   };
   const diff = diffSurveys(current, incoming, { base: current });
   expect(applyMergeDecisions(diff, { 'section:new:add': 'current' })).toEqual(current);
+});
+
+describe('path groups', () => {
+  // a branches to b or c, both reach d; locking a's path groups a, b, c and fixes d and its neighbours
+  const branching = (): SurveySnapshot =>
+    survey([
+      radio('p', 'p'),
+      radio('a', 'a', { navigationRules: [{ condition: 'a == "yes"', target: 'c' }] }),
+      radio('b', 'b', { nextBlockId: 'd' }),
+      radio('c', 'c'),
+      radio('d', 'd'),
+      radio('e', 'e'),
+    ]);
+  const grouped = (): SurveySnapshot => ({ ...branching(), rootNode: lockPathGroup(branching().rootNode, 'a') });
+
+  test('a path group set upstream is a lock change that follows the incoming side', () => {
+    const incoming = grouped();
+    const diff = diffSurveys(branching(), incoming);
+    for (const uuid of ['a', 'b', 'c', 'd']) {
+      expect(hunk(diff, `${uuid}:key:lockGroup`)).toMatchObject({ category: 'lock', locked: true, defaultDecision: 'incoming' });
+    }
+    expect(resolveDecision(hunk(diff, 'd:key:lockGroup')!, { 'd:key:lockGroup': 'current' })).toBe('incoming');
+    const merged = applyMergeDecisions(diff, bulkDecisions(diff, 'current'));
+    expect(items(merged).map((block) => block.lockGroup)).toEqual(items(incoming).map((block) => block.lockGroup));
+    expect(validateMergedSurvey(merged, { incoming })).toEqual([]);
+  });
+
+  test('a merged form that regroups or separates a locked path is an error', () => {
+    const incoming = grouped();
+    const regrouped = structuredClone(incoming);
+    delete items(regrouped)[2].lockGroup;
+    expect(validateMergedSurvey(regrouped, { incoming }).map((issue) => issue.code)).toContain('path-group-changed');
+
+    const separated = structuredClone(incoming);
+    const list = items(separated);
+    list.push(...list.splice(2, 1));
+    expect(validateMergedSurvey(separated, { incoming }).map((issue) => issue.code)).toEqual(['path-group-order']);
+  });
+
+  test("a path group only the current side has doesn't block the merge", () => {
+    const current = grouped();
+    const merged = applyMergeDecisions(diffSurveys(current, branching()));
+    expect(validateMergedSurvey(merged, { incoming: branching() })).toEqual([]);
+  });
 });

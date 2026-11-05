@@ -236,6 +236,22 @@ export function isOrderChangeAllowed(prev: BlockData[] | undefined, next: BlockD
   return groupNeighbours(flattenItems(prev)).every((pair) => kept.has(pair));
 }
 
+/**
+ * How `next` departs from the path groups of `previous`: the grouped blocks it
+ * drops or regroups, and whether it separates, reorders or splits two
+ * neighbouring blocks of a group. Groups only `next` has are not counted.
+ */
+export function findPathGroupChanges(previous: NodeData | null, next: NodeData | null): { changed: BlockData[]; separated: boolean } {
+  const nextBlocks = getOrderedBlocks(next);
+  const nextByUuid = new Map(nextBlocks.filter((block) => block.uuid).map((block) => [block.uuid as string, block]));
+  const previousBlocks = getOrderedBlocks(previous);
+  const changed = previousBlocks.filter(
+    (block) => block.lockGroup && JSON.stringify(nextByUuid.get(block.uuid as string)?.lockGroup) !== JSON.stringify(block.lockGroup)
+  );
+  const kept = new Set(groupNeighbours(nextBlocks));
+  return { changed, separated: !groupNeighbours(previousBlocks).every((pair) => kept.has(pair)) };
+}
+
 /** Throws if a whole-form import changes any block's path group or separates its neighbours. */
 export function assertPathGroupsPreserved(previous: NodeData | null, next: NodeData): void {
   const groupsOf = (root: NodeData | null) => {

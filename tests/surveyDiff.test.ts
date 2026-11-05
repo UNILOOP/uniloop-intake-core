@@ -460,3 +460,27 @@ describe('pages with show/hide rules', () => {
     ]);
   });
 });
+
+describe('page settings from the builder', () => {
+  test("a page's layout and its \"and\" navigation rule set upstream are page changes that are taken", () => {
+    const rule = { condition: 'smoker == "yes" && packs > 1', target: 'd' };
+    const base = survey([radio('a', 'smoker'), page('p1', 'Habits', [radio('b', 'packs')]), radio('d', 'advice')]);
+    const incoming = survey([
+      radio('a', 'smoker'),
+      { ...page('p1', 'Habits', [radio('b', 'packs')]), pageLayout: 'twoColumns', navigationRules: [rule] },
+      radio('d', 'advice'),
+    ]);
+    const diff = diffSurveys(structuredClone(base), incoming, { base });
+    const pageHunks = diff.hunks.filter((candidate) => candidate.blockKey === 'p1');
+    expect(pageHunks.map((candidate) => [candidate.kind, candidate.category, candidate.defaultDecision])).toEqual(
+      expect.arrayContaining([
+        ['page-field', 'settings', 'incoming'],
+        ['page-field', 'navigation', 'incoming'],
+      ])
+    );
+    const merged = items(applyMergeDecisions(diff))[1];
+    expect(merged.pageLayout).toBe('twoColumns');
+    expect(merged.navigationRules).toEqual([rule]);
+    expect(merged.items?.map((block) => block.uuid)).toEqual(['b']);
+  });
+});

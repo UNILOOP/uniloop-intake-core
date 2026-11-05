@@ -156,11 +156,12 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   }, [currentPage, currentBlockIndex, autoFocus]);
 
   // Open each step at its top; the page otherwise keeps the last step's scroll position
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reruns on every step change, which the body doesn't read
   useEffect(() => {
     const container = containerRef.current;
     if (!autoScroll || !container || container.getBoundingClientRect().top >= 0) return;
     container.scrollIntoView({ block: 'start' });
-  }, [currentPage, currentBlockIndex, autoScroll]);
+  }, [contentKey, autoScroll]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import React, { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { SurveyFormProvider, useSurveyForm } from '../src/context/SurveyFormContext';
 import { RenderPageSurveyLayout } from '../src/renderer/layouts/RenderPageSurveyLayout';
@@ -9,9 +9,9 @@ const blocks: BlockData[] = [
   { type: 'textfield', uuid: 'b-one', fieldName: 'one' },
   { type: 'textfield', uuid: 'b-two', fieldName: 'two' },
 ];
-const survey = { rootNode: { type: 'section', uuid: 'root', items: blocks }, mode: 'pageless' as const };
+const survey: ComponentProps<typeof SurveyFormProvider>['surveyData'] = { rootNode: { type: 'section', uuid: 'root', items: blocks }, mode: 'pageless' as const };
 
-const proto = HTMLElement.prototype as any;
+const proto = HTMLElement.prototype;
 const original = { scrollIntoView: proto.scrollIntoView, getBoundingClientRect: proto.getBoundingClientRect };
 
 let root: Root | null = null;
@@ -40,36 +40,44 @@ function mount(top: number, autoScroll?: boolean) {
   };
   container = document.createElement('div');
   document.body.appendChild(container);
-  root = createRoot(container);
+  const mountedRoot = createRoot(container);
+  root = mountedRoot;
   act(() =>
-    root!.render(
-      <SurveyFormProvider surveyData={survey as any}>
+    mountedRoot.render(
+      <SurveyFormProvider surveyData={survey}>
         <Probe />
         <RenderPageSurveyLayout autoFocus={false} autoScroll={autoScroll} />
       </SurveyFormProvider>
     )
   );
-  return { probe, scrolled };
+  return {
+    get context() {
+      if (!probe.current) throw new Error('Survey context was not mounted');
+      return probe.current;
+    },
+    scrolled,
+  };
 }
 
 describe('page scroll', () => {
   test('a new step scrolled out of view is brought back to its top', () => {
-    const { probe, scrolled } = mount(-400);
+    const mounted = mount(-400);
+    const { scrolled } = mounted;
     scrolled.length = 0;
-    act(() => probe.current!.goToNextBlock({ one: 'x' }));
-    expect(probe.current!.currentBlockIndex + probe.current!.currentPage).toBeGreaterThan(0);
+    act(() => mounted.context.goToNextBlock({ one: 'x' }));
+    expect(mounted.context.currentBlockIndex + mounted.context.currentPage).toBeGreaterThan(0);
     expect(scrolled).toHaveLength(1);
     expect((scrolled[0] as HTMLElement).className).toContain('medvi-layout');
   });
 
   test('a step already in view, or autoScroll off, leaves the scroll alone', () => {
     const inView = mount(0);
-    act(() => inView.probe.current!.goToNextBlock({ one: 'x' }));
+    act(() => inView.context.goToNextBlock({ one: 'x' }));
     expect(inView.scrolled).toHaveLength(0);
     act(() => root?.unmount());
 
     const off = mount(-400, false);
-    act(() => off.probe.current!.goToNextBlock({ one: 'x' }));
+    act(() => off.context.goToNextBlock({ one: 'x' }));
     expect(off.scrolled).toHaveLength(0);
   });
 });

@@ -1,5 +1,7 @@
 // RenderPageSurveyLayout (MedVi look-alike)
-import React, { useEffect, useRef, useState, Fragment } from 'react';
+import type React from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
+import type { ThemeDefinition } from '../../types';
 import { useSurveyForm } from '../../context/SurveyFormContext';
 import { BlockRenderer } from '../renderers/BlockRenderer';
 import { getBlockFieldErrors } from '../../utils/blockFields';
@@ -41,31 +43,8 @@ interface RenderPageSurveyLayoutProps {
   submitText?: string;
   enableDebug?: boolean;
   showNavigationHistory?: boolean;
-  logo?: any;
+  logo?: React.ReactNode | ((className?: string) => React.ReactNode);
 }
-
-const Star = ({ className }: { className: string }) => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-  >
-    <g clipPath="url(#clip0_39_803)">
-      <path
-        d="M11.4847 10.1132L12.9447 14.6079L8.00267 11.0159L11.4847 10.1132ZM16 5.20658H9.89L8.00333 -0.607422L6.11 5.20791L0 5.19991L4.948 8.79791L3.05467 14.6072L8.00267 11.0159L11.058 8.79791L16 5.20658Z"
-        fill="#00B67A"
-      />
-    </g>
-    <defs>
-      <clipPath id="clip0_39_803">
-        <rect width="16" height="16" fill="white" />
-      </clipPath>
-    </defs>
-  </svg>
-);
 
 const MotionFragment = motion.create(Fragment);
 
@@ -84,10 +63,8 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   },
   autoScroll = true,
   autoFocus = true,
-  showSummary = false,
   submitText = 'Complete Survey',
   enableDebug = false,
-  showNavigationHistory = false,
   logo = null,
 }) => {
   const {
@@ -111,11 +88,11 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   } = useSurveyForm();
 
   // Theme-driven styling (fallbacks keep MedVi defaults)
-  const themeColors = (theme as any)?.colors || {};
-  const themeButton = (theme as any)?.button || {};
-  const themeProgress = (theme as any)?.progress || {};
-  const themeContainer = (theme as any)?.containerLayout || '';
-  const themeBackground = (theme as any)?.background || '';
+  const themeColors: Partial<ThemeDefinition['colors']> = theme?.colors || {};
+  const themeButton: Partial<ThemeDefinition['button']> = theme?.button || {};
+  const themeProgress: Partial<ThemeDefinition['progress']> = theme?.progress || {};
+  const themeContainer = theme?.containerLayout || '';
+  const themeBackground = theme?.background || '';
 
   // Colors
   const bgColor = themeColors.background || '#FAFAFA';
@@ -142,6 +119,7 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   const [isReady, setIsReady] = useState(false);
   const contentKey = `page-${currentPage}-block-${currentBlockIndex}`;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new step restarts the entrance animation
   useEffect(() => {
     setIsReady(false);
     const raf = requestAnimationFrame(() => setIsReady(true));
@@ -149,6 +127,7 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
   }, [contentKey]);
 
   // Auto-focus first input when step changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refocusing is triggered by step changes
   useEffect(() => {
     if (autoFocus && firstInputRef.current) {
       setTimeout(() => firstInputRef.current?.focus(), 200);

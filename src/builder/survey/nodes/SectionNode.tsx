@@ -19,8 +19,10 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { GripVertical, Plus } from "lucide-react";
 import { ContentBlockItem } from "../blocks/ContentBlockItem";
+import { addPage, isPageItem, moveBlock, removePageKeepingBlocks } from "../helpers/pageItems";
+import { getAllPageLayoutDefinitions, isPageOverrideTarget } from "../../../renderer/layouts/pageLayouts";
 
-// Lazy load ContentBlockPage - only used in tabs for paged mode
+// Lazy load ContentBlockPage - only used for pages
 const ContentBlockPage = lazy(() => import("../blocks/ContentBlockPage").then(m => ({ default: m.ContentBlockPage })));
 
 interface SectionNodeProps {
@@ -34,7 +36,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   onUpdate,
   onRemove,
 }) => {
-  const { createNode, state } = useSurveyBuilder();
+  const { createNode, state, pageOverrides } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -176,6 +178,30 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
     });
   };
 
+  // === Pages among single blocks (pageless mode) ===
+  const isPage = isPageItem;
+
+  // Stacked is the default view, so its pages don't save a layout name
+  const handleAddHybridPage = (layoutName: string, index?: number) => {
+    onUpdate({
+      ...data,
+      items: addPage(data.items || [], layoutName === "stacked" ? undefined : layoutName, index),
+    });
+  };
+
+  const handleRemoveHybridPage = (index: number) => {
+    onUpdate({ ...data, items: removePageKeepingBlocks(data.items || [], index) });
+  };
+
+  const handleMoveBlock = (blockUuid: string, target: string) => {
+    onUpdate({ ...data, items: moveBlock(data.items || [], blockUuid, target) });
+  };
+
+  const pageMoveTargets = (exceptPageUuid?: string) =>
+    ((data.items || []) as BlockData[])
+      .filter((item) => isPage(item) && item.uuid !== exceptPageUuid)
+      .map((page) => ({ value: `page:${page.uuid}`, label: `Into ${page.name || "Page"}` }));
+
   // === Common handlers ===
   const handleAddChildSection = () => {
     if (data.uuid) {
@@ -225,38 +251,79 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
       </Button>
     );
 
+    const renderPageLayouts = () => (
+      <div className="flex flex-col gap-1.5">
+        {getAllPageLayoutDefinitions().filter((layout) => !isPageOverrideTarget(layout.name, pageOverrides)).map((layout) => (
+          <Button
+            type="button"
+            key={layout.name}
+            variant="outline"
+            onClick={() => handleAddHybridPage(layout.name)}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("application/x-page-layout", layout.name);
+            }}
+            title={layout.description}
+            className="h-auto flex-col items-stretch gap-1 w-full p-2 text-xs whitespace-normal"
+          >
+            {layout.renderPreview && <div className="pointer-events-none">{layout.renderPreview()}</div>}
+            <span className="font-medium text-left truncate">{layout.label || layout.name}</span>
+            {layout.description && (
+              <span className="text-muted-foreground text-left font-normal">{layout.description}</span>
+            )}
+          </Button>
+        ))}
+        <p className="text-xs text-muted-foreground mt-1.5">
+          A page shows several blocks on one screen. Click to add one or drag it to the form.
+        </p>
+      </div>
+    );
+
     return (
       <div className="w-56 flex-shrink-0 rounded-xl border-1 bg-muted/30 p-3 overflow-y-auto max-h-[70vh] sticky top-0">
-        <h4 className="text-sm font-semibold mb-3">Add Block</h4>
+        <Tabs defaultValue="blocks" className="w-full">
+          <TabsList className="w-full mb-3">
+            <TabsTrigger value="blocks" className="text-xs flex-1">Blocks</TabsTrigger>
+            <TabsTrigger value="pages" className="text-xs flex-1">Pages</TabsTrigger>
+          </TabsList>
 
-        {hasCustomBlocks ? (
-          <Tabs defaultValue="default" className="w-full">
-            <TabsList className="w-full mb-2">
-              <TabsTrigger value="default" className="text-xs flex-1">Default</TabsTrigger>
-              <TabsTrigger value="custom" className="text-xs flex-1">Custom</TabsTrigger>
-            </TabsList>
+          <TabsContent value="pages" className="mt-0">
+            {renderPageLayouts()}
+          </TabsContent>
 
-            <TabsContent value="default" className="mt-0">
+          <TabsContent value="blocks" className="mt-0">
+            <h4 className="text-sm font-semibold mb-3">Add Block</h4>
+
+            {hasCustomBlocks ? (
+              <Tabs defaultValue="default" className="w-full">
+                <TabsList className="w-full mb-2">
+                  <TabsTrigger value="default" className="text-xs flex-1">Default</TabsTrigger>
+                  <TabsTrigger value="custom" className="text-xs flex-1">Custom</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="default" className="mt-0">
+                  <div className="flex flex-col gap-1.5">
+                    {defaultBlocks.map(renderBlockButton)}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="custom" className="mt-0">
+                  <div className="flex flex-col gap-1.5">
+                    {customBlocks.map(renderBlockButton)}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            ) : (
               <div className="flex flex-col gap-1.5">
                 {defaultBlocks.map(renderBlockButton)}
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="custom" className="mt-0">
-              <div className="flex flex-col gap-1.5">
-                {customBlocks.map(renderBlockButton)}
-              </div>
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {defaultBlocks.map(renderBlockButton)}
-          </div>
-        )}
-
-        <p className="text-xs text-muted-foreground mt-3">
-          Click to add or drag blocks to the form
-        </p>
+            <p className="text-xs text-muted-foreground mt-3">
+              Click to add or drag blocks to the form
+            </p>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
@@ -272,7 +339,10 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
         }
       `}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-block-type")) {
+        if (
+          e.dataTransfer.types.includes("application/x-block-type") ||
+          e.dataTransfer.types.includes("application/x-page-layout")
+        ) {
           e.preventDefault();
           e.stopPropagation();
           setDragOverIndex(index);
@@ -289,8 +359,11 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const type = e.dataTransfer.getData("application/x-block-type");
+        const layoutName = e.dataTransfer.getData("application/x-page-layout");
         if (type) {
           handleAddBlockItem(type, index);
+        } else if (layoutName) {
+          handleAddHybridPage(layoutName, index);
         }
         setDragOverIndex(null);
       }}
@@ -336,13 +409,28 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
                     <SortableItemHandle className="absolute -left-5 top-2 cursor-grab text-muted-foreground">
                       <GripVertical className="h-4 w-4" />
                     </SortableItemHandle>
-                    <ContentBlockItem
-                      data={block}
-                      onUpdate={(updatedBlock) =>
-                        handleBlockUpdate(index, updatedBlock)
-                      }
-                      onRemove={() => handleBlockRemove(index)}
-                    />
+                    {isPage(block) ? (
+                      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading page...</div>}>
+                        <ContentBlockPage
+                          data={block}
+                          onUpdate={(updatedPage) => handleBlockUpdate(index, updatedPage)}
+                          onRemove={() => handleRemoveHybridPage(index)}
+                          hybrid
+                          moveTargets={[{ value: "root", label: "Out of page" }, ...pageMoveTargets(block.uuid)]}
+                          onMoveBlock={handleMoveBlock}
+                        />
+                      </Suspense>
+                    ) : (
+                      <ContentBlockItem
+                        data={block}
+                        onUpdate={(updatedBlock) =>
+                          handleBlockUpdate(index, updatedBlock)
+                        }
+                        onRemove={() => handleBlockRemove(index)}
+                        moveTargets={pageMoveTargets()}
+                        onMove={block.uuid ? (target) => handleMoveBlock(block.uuid as string, target) : undefined}
+                      />
+                    )}
                   </div>
                 </SortableItem>
                 {/* Drop zone after each block */}
@@ -357,7 +445,10 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
           <div
             className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center"
             onDragOver={(e) => {
-              if (e.dataTransfer.types.includes("application/x-block-type")) {
+              if (
+                e.dataTransfer.types.includes("application/x-block-type") ||
+                e.dataTransfer.types.includes("application/x-page-layout")
+              ) {
                 e.preventDefault();
                 setDragOverIndex(0);
               }
@@ -365,8 +456,11 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
             onDragLeave={() => setDragOverIndex(null)}
             onDrop={(e) => {
               const type = e.dataTransfer.getData("application/x-block-type");
+              const layoutName = e.dataTransfer.getData("application/x-page-layout");
               if (type) {
                 handleAddBlockItem(type, 0);
+              } else if (layoutName) {
+                handleAddHybridPage(layoutName, 0);
               }
               setDragOverIndex(null);
             }}

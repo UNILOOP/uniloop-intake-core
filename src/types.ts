@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from "react";
+import type { NavigationButtonsProps } from "./renderer/layouts/helpers/NavigationButtons";
 
 export type UUID = string;
 
@@ -380,6 +381,12 @@ export interface NavigationHistoryEntry {
  */
 export type BlockOverrides = Record<string, string>;
 
+/**
+ * Maps a page name (the `pageLayout` a page saves) to the registered page layout
+ * that draws it in its place, e.g. `{ uniemrIntake: 'ivyIntake' }`.
+ */
+export type PageOverrides = Record<string, string>;
+
 export interface SurveyFormRendererProps {
   survey: {
     rootNode: NodeData;
@@ -422,6 +429,8 @@ export interface SurveyFormRendererProps {
   layout?: string | React.FC<LayoutProps>;
   // A/B testing configuration
   abTestPreviewMode?: boolean; // If true, bypasses storage and selects fresh variants each time
+  /** The form runs in the builder's preview, which shows notices meant for the form's author */
+  isPreview?: boolean;
   // Analytics configuration
   analytics?: {
     enabled?: boolean;
@@ -496,6 +505,13 @@ export interface SurveyFormRendererProps {
    */
   blockOverrides?: BlockOverrides;
   /**
+   * Replaces pages with registered page layouts, keyed by the page name a page
+   * saves (`pageLayout`), e.g. `{ uniemrIntake: 'ivyIntake' }`. The page keeps its
+   * saved name. If the mapped layout isn't registered or throws while
+   * rendering, the page draws with the layout registered under its own name.
+   */
+  pageOverrides?: PageOverrides;
+  /**
    * Values kept outside the form (e.g. a patient record). Rules can read them,
    * blocks bound to them through `external.sync` stay in step both ways, and
    * `external.store.setValues` updates a mounted form in place.
@@ -546,6 +562,51 @@ export interface LayoutDefinition {
   name: string;
   description?: string;
   component: React.FC<LayoutProps>;
+}
+
+/**
+ * What a page layout receives. Values, errors, show/hide rules and Continue stay
+ * with the form; the layout only decides where each block goes.
+ *
+ * Call the helpers in the layout's own body. Blocks drawn only by a child
+ * component (tabs, an accordion) still show, but count as never drawn in the
+ * preview's notice.
+ */
+export interface PageLayoutProps {
+  /** The page as built, with its name and settings (not localized) */
+  page: BlockData;
+  /** Every block of the page as built, hidden ones included */
+  blocks: BlockData[];
+  /**
+   * Draws one block, by its position in the page as built or by its fieldName.
+   * A hidden block, a block already drawn, or a reference that matches no block
+   * draws nothing, so positions don't shift as answers show and hide blocks.
+   */
+  renderBlock: (ref: number | string) => React.ReactNode;
+  /** Draws every visible block not drawn yet, in page order. Call it after any renderBlock calls. */
+  renderBlocks: () => React.ReactNode;
+  /**
+   * Draws the page's Continue (Submit on the last step), wired like the form's
+   * own. For a layout with `ownsNavigation`; Back stays with the form layout
+   * unless `showPrevious` is passed.
+   */
+  renderNavigation: (props?: NavigationButtonsProps) => React.ReactNode;
+}
+
+export interface PageLayoutDefinition {
+  name: string;
+  /** Shown in the builder's Pages tab (falls back to the name) */
+  label?: string;
+  description?: string;
+  /** A plain function component gets the preview's notice about blocks it never draws */
+  component: React.ComponentType<PageLayoutProps>;
+  /** A small sketch of the layout for the builder's Pages tab */
+  renderPreview?: () => React.ReactNode;
+  /**
+   * The layout draws the page's Continue itself with `renderNavigation()`, so
+   * the form layout leaves its own Continue out on this page.
+   */
+  ownsNavigation?: boolean;
 }
 
 export interface BlockRendererProps {
@@ -638,6 +699,7 @@ export interface SurveyFormContextProps {
   enableDebug?: boolean;
   logo?: any;
   abTestPreviewMode?: boolean;
+  isPreview?: boolean;
   analytics?: {
     surveyId?: string;
     sessionId?: string;
@@ -648,6 +710,7 @@ export interface SurveyFormContextProps {
   };
   customData?: any;
   blockOverrides?: BlockOverrides;
+  pageOverrides?: PageOverrides;
   /** Steps of the form: one block each, or every block of a page */
   pages?: Array<BlockData[]>;
   /** Whether the current step is a page, which shows its visible blocks together */
@@ -782,6 +845,8 @@ export interface BlockData {
   visibleIf?: any;
   /** Shows or hides the block as answers change; a hidden block outside a page is skipped */
   visibility?: BlockVisibility;
+  /** On a page: the registered page layout that places its blocks (stacked when unset) */
+  pageLayout?: string;
   isEndBlock?: boolean;
   /** Whether isEndBlock was manually set by the user (prevents auto-clearing) */
   isEndBlockManual?: boolean;

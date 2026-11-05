@@ -6,51 +6,29 @@ import { Textarea } from "../../../components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
-import { NodeData, BlockData } from "../../../types";
+import { NodeData } from "../../../types";
 import { ensureNodeUuids } from "../../../utils/nodeUtils";
 import { detectSurveyMode } from "../../../utils/surveyUtils";
 import { DEFAULT_LANGUAGE_CODE } from "../../../utils/languages";
 import { assertLockedBlocksPreserved } from "../../../utils/blockLock";
 
 /**
- * Converts a paged survey structure to pageless by extracting all blocks from pages
- * @param rootNode The rootNode with pages (sets)
- * @returns A new rootNode with blocks directly in items (no pages)
+ * Converts a pageless survey structure to paged by wrapping each single block in
+ * a page. Pages already in the form stay as they are.
+ * @param rootNode The rootNode with blocks (and maybe pages) directly in items
+ * @returns A new rootNode with only pages (sets) in items
  */
-function convertPagedToPageless(rootNode: NodeData): NodeData {
-  const allBlocks: BlockData[] = [];
-
-  // Extract blocks from all pages (sets)
-  if (rootNode.items && rootNode.items.length > 0) {
-    for (const item of rootNode.items) {
-      if (item.type === 'set' && item.items) {
-        // This is a page - extract its blocks
-        allBlocks.push(...item.items);
-      } else {
-        // This is already a block (shouldn't happen in paged mode but handle anyway)
-        allBlocks.push(item as BlockData);
-      }
-    }
-  }
-
-  return {
-    ...rootNode,
-    items: allBlocks,
-  };
-}
-
-/**
- * Converts a pageless survey structure to paged by wrapping all blocks in pages
- * @param rootNode The rootNode with blocks directly in items
- * @returns A new rootNode with blocks wrapped in pages (sets)
- */
-function convertPagelessToPaged(rootNode: NodeData): NodeData {
+export function convertPagelessToPaged(rootNode: NodeData): NodeData {
   const pages: NodeData[] = [];
 
   // Group blocks into pages - for now, we create one page per block
   // This maintains block-by-block navigation behavior from pageless mode
   if (rootNode.items && rootNode.items.length > 0) {
     rootNode.items.forEach((block, index) => {
+      if (block.type === 'set') {
+        pages.push(block);
+        return;
+      }
       pages.push({
         type: 'set',
         name: `Page ${index + 1}`,
@@ -113,12 +91,9 @@ export const JsonEditor: React.FC = () => {
 
       let rootNodeToImport = data.rootNode as NodeData;
 
-      // Convert between modes if necessary
-      if (builderMode === 'pageless' && importedMode === 'paged') {
-        // Builder is pageless but import is paged - convert to pageless
-        rootNodeToImport = convertPagedToPageless(rootNodeToImport);
-        setSuccess("Survey imported and converted from paged to pageless format!");
-      } else if (builderMode === 'paged' && importedMode === 'pageless') {
+      // A pageless builder keeps pages (sets) as pages among its blocks, so only
+      // a paged builder converts
+      if (builderMode === 'paged' && importedMode === 'pageless') {
         // Builder is paged but import is pageless - convert to paged
         rootNodeToImport = convertPagelessToPaged(rootNodeToImport);
         setSuccess("Survey imported and converted from pageless to paged format!");
@@ -163,8 +138,8 @@ export const JsonEditor: React.FC = () => {
                 Paste a valid JSON survey definition below to import it.
                 {builderMode === 'pageless' && (
                   <span className="block mt-1 text-blue-600">
-                    Current mode: <strong>Pageless</strong> (blocks only, no pages).
-                    Paged surveys will be automatically converted.
+                    Current mode: <strong>Pageless</strong> (blocks, and pages that show several blocks together).
+                    Pages in the import stay pages.
                   </span>
                 )}
                 {builderMode === 'paged' && (

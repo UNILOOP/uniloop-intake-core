@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   Card,
@@ -26,22 +26,49 @@ import { ContentBlockItem } from "./ContentBlockItem";
 import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
+import { getAllPageLayoutDefinitions, getPageLayoutDefinition, isPageOverrideTarget } from "../../../renderer/layouts/pageLayouts";
 import { containsLockedBlock } from "../../../utils/blockLock";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
+
+const NavigationRulesEditor = lazy(() => import("../../common/NavigationRulesEditor").then(m => ({ default: m.NavigationRulesEditor })));
 
 interface ContentBlockPageProps {
   data: BlockData;
   onUpdate: (data: BlockData) => void;
   onRemove: () => void;
+  /**
+   * The page sits among single blocks. Removing it keeps its blocks, it gets its
+   * own navigation rules, and its blocks can move out of it.
+   */
+  hybrid?: boolean;
+  /** Where this page's blocks can move */
+  moveTargets?: Array<{ value: string; label: string }>;
+  onMoveBlock?: (blockUuid: string, target: string) => void;
 }
 
 export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
   data,
   onUpdate,
   onRemove,
+  hybrid = false,
+  moveTargets = [],
+  onMoveBlock,
 }) => {
-  const { state } = useSurveyBuilder();
+  const { state, pageOverrides } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
-  const hasLockedBlock = containsLockedBlock(data);
+  const [isEditing, setIsEditing] = useState(false);
+  // Removing a hybrid page keeps its blocks, so a locked block doesn't stop it
+  const removeDisabled = !hybrid && containsLockedBlock(data);
+
+  const layoutName = data.pageLayout;
+  const layoutDefinition = layoutName ? getPageLayoutDefinition(layoutName) : undefined;
+  const layoutLabel = layoutName ? (layoutDefinition ? layoutDefinition.label || layoutDefinition.name : `${layoutName} (not available)`) : undefined;
+
+  // Stacked clears the setting, so a page without one keeps today's view
+  const handleLayoutChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { pageLayout: _cleared, ...rest } = data;
+    onUpdate(e.target.value && e.target.value !== "stacked" ? { ...data, pageLayout: e.target.value } : rest);
+  };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({
@@ -116,6 +143,11 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
             className="w-full sm:w-[300px]"
           />
         </div>
+        {hybrid && layoutLabel && (
+          <span className="text-xs bg-muted px-2 py-1 rounded-md" title="Page layout">
+            {layoutLabel}
+          </span>
+        )}
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
@@ -128,16 +160,58 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
           >
             {collapsed ? "Expand" : "Collapse"}
           </Button>
+          {hybrid && (
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="grow sm:grow-0">
+                  Edit
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl w-4xl overflow-y-scroll max-h-screen">
+                <DialogHeader>
+                  <DialogTitle>Edit {data.name || "Page"}</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  The page shows its visible blocks together with one Continue. These rules decide where Continue goes; the blocks' own rules don't apply on a page.
+                </p>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Layout
+                  <select
+                    aria-label="Page layout"
+                    value={layoutName || "stacked"}
+                    onChange={handleLayoutChange}
+                    className="w-full px-3 py-2 border border-input bg-background text-sm font-normal rounded-md"
+                  >
+                    {getAllPageLayoutDefinitions().filter((layout) => !isPageOverrideTarget(layout.name, pageOverrides)).map((layout) => (
+                      <option key={layout.name} value={layout.name}>
+                        {layout.label || layout.name}
+                      </option>
+                    ))}
+                    {layoutName && !layoutDefinition && <option value={layoutName}>{layoutLabel}</option>}
+                  </select>
+                </label>
+                <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading editors...</div>}>
+                  <NavigationRulesEditor data={data} onUpdate={onUpdate} />
+                </Suspense>
+              </DialogContent>
+            </Dialog>
+          )}
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={onRemove}
-            disabled={hasLockedBlock}
-            title={hasLockedBlock ? "This page has a locked block" : undefined}
+            disabled={removeDisabled}
+            title={
+              removeDisabled
+                ? "This page has a locked block"
+                : hybrid
+                  ? "Its blocks move back to the form"
+                  : undefined
+            }
             className="grow sm:grow-0"
           >
-            Remove
+            {hybrid ? "Remove Page" : "Remove"}
           </Button>
         </div>
       </CardHeader>
@@ -180,6 +254,9 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
                           handleBlockUpdate(index, updatedBlock)
                         }
                         onRemove={() => handleBlockRemove(index)}
+                        inPage={hybrid}
+                        moveTargets={moveTargets}
+                        onMove={onMoveBlock && block.uuid ? (target) => onMoveBlock(block.uuid as string, target) : undefined}
                       />
                     </div>
                   </SortableItem>

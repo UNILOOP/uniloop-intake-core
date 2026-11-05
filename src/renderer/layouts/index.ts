@@ -99,6 +99,15 @@ export function getLayoutComponent(
   return RenderPageSurveyLayout;
 }
 
+export {
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  resolvePageLayout,
+  registerPageLayout,
+  unregisterPageLayout,
+} from './pageLayouts';
+
 // Export the default layout for direct import
 export { RenderPageSurveyLayout };
 
@@ -127,5 +136,5 @@ export type {
 } from './VoiceLayout';
 
 // Export helper components and utilities
-export { CurrentBlock, NavigationButtons, ProgressIndicator } from './helpers';
+export { CurrentBlock, NavigationButtons, ProgressIndicator, usePageOwnsNavigation } from './helpers';
 export { createLayout } from './createLayout';

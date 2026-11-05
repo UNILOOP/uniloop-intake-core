@@ -9,6 +9,7 @@ import { cn } from '../../lib/utils';
 import { getSurveyPages, detectSurveyMode } from '../../utils/surveyUtils';
 import { AnalyticsTrackedLayout } from './AnalyticsTrackedLayout';
 import { CurrentBlock } from './helpers/CurrentBlock';
+import { usePageOwnsNavigation } from './helpers/NavigationButtons';
 
 interface RenderPageSurveyLayoutProps {
   progressBar?:
@@ -114,6 +115,7 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
     currentPageNode,
     currentStepBlocks,
   } = useSurveyForm();
+  const pageOwnsNavigation = usePageOwnsNavigation();
 
   // Theme-driven styling (fallbacks keep MedVi defaults)
   const themeColors = (theme as any)?.colors || {};
@@ -186,7 +188,8 @@ export const RenderPageSurveyLayout: React.FC<RenderPageSurveyLayoutProps> = ({
 
   const showNextButton =
     navigationButtons?.showNext !== false &&
-    currentBlock?.showContinueButton !== false;
+    currentBlock?.showContinueButton !== false &&
+    !pageOwnsNavigation;
 
   // Debug info (only shown when enableDebug is true)
   const debugInfo = enableDebug

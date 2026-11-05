@@ -10,7 +10,7 @@ import type {
   BranchingLogic
 } from "../types";
 import { getSurveyPages, getSurveyPageIds, evaluateLogic, detectSurveyMode, isPageNode } from "../utils/surveyUtils";
-import type { BlockOverrides, SurveyMode } from "../types";
+import type { BlockOverrides, PageOverrides, SurveyMode } from "../types";
 import { validationRuleToFunction } from "../builder/common/validation-rules-types";
 import {
   evaluateCondition,
@@ -133,10 +133,14 @@ interface SurveyFormProviderProps {
   enableDebug?: boolean;
   logo?: any;
   abTestPreviewMode?: boolean; // If true, bypasses storage and selects fresh variants each time
+  /** The form runs in the builder's preview */
+  isPreview?: boolean;
   analytics?: any; // Analytics configuration passed from SurveyForm
   customData?: any; // Custom data for custom blocks
   /** System block type to the registered block type that renders in its place. */
   blockOverrides?: BlockOverrides;
+  /** Page name to the registered page layout that draws it in its place. */
+  pageOverrides?: PageOverrides;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -179,9 +183,11 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   debug = false,
   logo = null,
   abTestPreviewMode = false,
+  isPreview = false,
   analytics,
   customData,
   blockOverrides,
+  pageOverrides,
   mode,
   external,
   flattenPages = false,
@@ -1378,9 +1384,11 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         isCurrentPageValid,
         logo,
         abTestPreviewMode,
+        isPreview,
         analytics,
         customData,
         blockOverrides,
+        pageOverrides,
         externalValues,
         setExternalValues,
         pages,

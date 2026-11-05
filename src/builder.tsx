@@ -70,10 +70,22 @@ export { SimpleCustomField } from './examples/SimpleCustomField';
 
 export type { ExternalField } from './external';
 
+// Page layouts a page can pick in the builder
+export {
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  resolvePageLayout,
+  registerPageLayout,
+  unregisterPageLayout,
+} from './renderer/layouts/pageLayouts';
+
 // Re-export types needed for building
 export type {
   NodeDefinition,
   BlockDefinition,
+  PageLayoutDefinition,
+  PageLayoutProps,
   NodeData,
   BlockData,
   GlobalCustomField,
@@ -81,6 +93,7 @@ export type {
   EditorMode,
   ContentBlockItemProps,
   BlockOverrides,
+  PageOverrides,
 } from './types';
 
 // Merging two versions of a form (see src/merge.tsx for the full surface)

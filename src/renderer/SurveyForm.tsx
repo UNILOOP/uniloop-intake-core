@@ -55,9 +55,11 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   themeMode = 'light',
   layout,
   abTestPreviewMode = false,
+  isPreview = false,
   analytics,
   customData,
   blockOverrides,
+  pageOverrides,
   mode,
   external,
 }) => {
@@ -385,9 +387,11 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             theme={themeConfig}
             logo={logo}
             abTestPreviewMode={abTestPreviewMode}
+            isPreview={isPreview}
             analytics={analytics}
             customData={customData}
             blockOverrides={blockOverrides}
+            pageOverrides={pageOverrides}
             mode={mode ?? survey.mode}
             external={external}
             flattenPages={layout === 'chat' || layout === 'voice'}

@@ -107,9 +107,16 @@ export {
   registerLayout,
   unregisterLayout,
   getLayoutComponent,
+  pageLayoutRegistry,
+  getPageLayoutDefinition,
+  getAllPageLayoutDefinitions,
+  resolvePageLayout,
+  registerPageLayout,
+  unregisterPageLayout,
   RenderPageSurveyLayout,
   CurrentBlock,
   NavigationButtons,
+  usePageOwnsNavigation,
   ProgressIndicator,
   createLayout
 } from './renderer/layouts';
@@ -234,6 +241,8 @@ export type {
   // Layout types
   LayoutDefinition,
   LayoutProps,
+  PageLayoutDefinition,
+  PageLayoutProps,
 
   // Localization types
   LocalizationMap,
@@ -245,6 +254,7 @@ export type {
   SurveyFormRendererProps,
   SurveyFormContextProps,
   BlockOverrides,
+  PageOverrides,
   ProgressBarOptions,
   NavigationButtonsOptions,
   PageRendererProps,

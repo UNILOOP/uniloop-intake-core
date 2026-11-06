@@ -66,6 +66,7 @@ const issues = validateMergedSurvey(merged, { incoming, definitions });
 - Every difference is a hunk with a category: text, options, paths, validation, visibility, identity, A/B test, lock, order, placement, settings, translations, theme. Paths and validation rules are diffed rule by rule.
 - With a `base`, each hunk knows who changed it: the incoming side is taken by default, the current side is kept, and a change on both sides is a conflict that keeps the current side until decided. Without a base every difference keeps the current side unless taken.
 - Provider-locked blocks (`locked: true` on the incoming block) always follow the incoming side on the paths their definition's `lockAccess` locks; a block without `lockAccess` is locked as a whole.
+- A path group (`lockGroup`, from "Lock its path") on the incoming side follows it too, and `validateMergedSurvey` reports a merged form that drops, regroups or separates the blocks of an incoming path group.
 - `decisions` can be controlled, so a host can keep one set per version while switching between them.
 - The side-by-side view (`initialTab="compare"`, the default) draws the current form on the left and the incoming one on the right, one row per block, with dashed placeholders where a column has no such block, and "Show result after applying" adds a third column that updates with every decision. Paths that differ are coloured and labelled with the question they depend on; unchanged conditional paths are faint. Clicking a block lights up every path in and out of it, clicking a path or its label singles it out in every column, and clicking empty canvas clears the highlight.
 
@@ -2755,6 +2756,22 @@ const UnitField = ({ data, onUpdate }: ContentBlockItemProps) => {
 renderFormFields: (props) => <UnitField {...props} />,
 lockAccess: { locked: ['unit'] },
 ```
+
+### Locking a Path
+
+A locked block's settings show a second checkbox, **Lock its path**. It follows the block's navigation rules and next-step links, as the form follows them, until its paths join again, and locks every block on the way. If the paths never join, it locks everything they reach before the form ends. A rule that targets a page leads to the page's first block. Show/hide conditions and calculated fields don't extend the path.
+
+The path is worked out once, when the box is checked, and saved on each block as `lockGroup`. Rules added later don't change it. The `lockGroup.id` is the first block's `uuid`, and the role is one of:
+
+| Role | Block | What it keeps fixed |
+|------|-------|---------------------|
+| `root` | The block the path was locked from | Locked as usual. Unchecking **Lock block** releases the whole path. |
+| `member` | A block on the path | Locked, and can't be unlocked on its own. Its settings say it's locked with the first block's path. |
+| `orderFixed` | The block where the paths join, and a block next to the path that runs into or out of it by list order | Its settings and its own rules stay editable, and Replace keeps it in the path. It can't be removed, and it can't be moved away from the path. |
+
+Nothing can be added between two neighbouring blocks of a path, and they can't be moved apart, in the list view or on the flow view's edges. A rule in another block that targets a path block stays editable. Releasing a path unlocks its blocks, except those that were locked before it (`lockGroup.wasLocked`). The JSON editor refuses an import that adds, changes or removes a `lockGroup`, or separates a path's neighbours. Within a page or section, the order is checked in each list; a path that runs across two sections isn't kept from being reordered between them.
+
+`hideBlockLockControls` hides this checkbox too. A host can lock a path in code with `lockPathGroup(rootNode, blockUuid)` and release it with `releasePathGroup(rootNode, blockUuid)`; `findPathGroup` returns which blocks a path would lock and fix without changing anything.
 
 ## Mobile Features
 

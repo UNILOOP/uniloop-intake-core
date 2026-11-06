@@ -11,10 +11,10 @@ import {CommonBlockRules} from "../../common/CommonBlockRules";
 import { FieldNameField, resolveFieldConfig } from "../../common/FieldNameField";
 import { OutputFieldsEditor } from "../../common/OutputFieldsEditor";
 import { ReplaceBlockDialog } from "../../common/ReplaceBlockDialog";
-import { BlockLockControl, BlockLockFieldset } from "../../common/BlockLock";
+import { BlockLockControl, BlockLockFieldset, usePathGroupNote } from "../../common/BlockLock";
 import { BlockLockProvider } from "../../../context/BlockLockContext";
-import { isBlockLocked, isBlockUpdateAllowed } from "../../../utils/blockLock";
-import { Lock, PieChart } from "lucide-react";
+import { isBlockLocked, isBlockRemovalLocked, isBlockUpdateAllowed } from "../../../utils/blockLock";
+import { Lock, Pin, PieChart } from "lucide-react";
 
 // Lazy load heavy rule editors - they're only used when dialog is open
 const NavigationRulesEditor = lazy(() => import("../../common/NavigationRulesEditor").then(m => ({ default: m.NavigationRulesEditor })));
@@ -37,6 +37,10 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
   const [isReplacing, setIsReplacing] = useState(false);
   const blockDefinition = state.definitions.blocks[data.type];
   const locked = isBlockLocked(data);
+  // A path group also holds blocks it doesn't lock, in place
+  const removalLocked = isBlockRemovalLocked(data);
+  const groupRole = data.lockGroup?.role;
+  const groupNote = usePathGroupNote(data);
 
   // Every edit to this block goes through here, so its lock holds for the
   // settings dialog, the block's own inline editing and replace.
@@ -44,7 +48,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
     if (isBlockUpdateAllowed(data, next, blockDefinition)) onUpdate(next);
   };
   const remove = () => {
-    if (!locked) onRemove();
+    if (!removalLocked) onRemove();
   };
 
   if (!blockDefinition) {
@@ -54,7 +58,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
           <div className="flex gap-2 items-center">
             <span className="text-destructive">Unknown block type: {data.type}</span>
           </div>
-          {!locked && (
+          {!removalLocked && (
             <div className="flex gap-2">
               <Button type="button"
                 variant="destructive"
@@ -88,9 +92,15 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
             </Badge>
           )}
           {locked && (
-            <Badge variant="secondary" className="gap-1">
-              <Lock className="h-3 w-3" />
-              Locked
+            <Badge variant="secondary" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Lock className="h-3 w-3 shrink-0" />
+              {groupRole === "root" || groupRole === "member" ? "Path locked" : "Locked"}
+            </Badge>
+          )}
+          {groupRole === "orderFixed" && (
+            <Badge variant="outline" className="gap-1 shrink-0 whitespace-nowrap" title={groupNote ?? undefined}>
+              <Pin className="h-3 w-3 shrink-0" />
+              Position fixed
             </Badge>
           )}
         </div>
@@ -104,7 +114,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                 Edit
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl w-4xl overflow-y-scroll max-h-screen">
+            <DialogContent className="max-w-4xl overflow-y-scroll max-h-screen">
               <DialogHeader>
                 <DialogTitle>Edit {blockDefinition.name}</DialogTitle>
               </DialogHeader>
@@ -126,7 +136,7 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                         data,
                         onUpdate: update,
                         onRemove: () => {
-                          if (locked) return;
+                          if (removalLocked) return;
                           setIsEditing(false);
                           onRemove();
                         },
@@ -169,13 +179,15 @@ export const ContentBlockItem: React.FC<ContentBlockItemProps> = ({
                 onReplace={update}
               />
 
-              <Button type="button"
-                variant="outline"
-                size="sm"
-                onClick={remove}
-              >
-                Remove
-              </Button>
+              {!removalLocked && (
+                <Button type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={remove}
+                >
+                  Remove
+                </Button>
+              )}
             </>
           )}
         </div>

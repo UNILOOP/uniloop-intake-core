@@ -27,6 +27,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { BlockData } from "../../../types";
 import { containsLockedBlock } from "../../../utils/blockLock";
+import { isOrderChangeAllowed, isPathContinuedAfter } from "../../../utils/pathGroupLock";
 
 interface ContentBlockPageProps {
   data: BlockData;
@@ -42,6 +43,9 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
   const { state } = useSurveyBuilder();
   const [collapsed, setCollapsed] = useState(false);
   const hasLockedBlock = containsLockedBlock(data);
+  // A locked path that runs on from this page's last block into the next page
+  const lastBlock = data.items?.[data.items.length - 1];
+  const addLocked = isPathContinuedAfter(state.rootNode, lastBlock?.uuid);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({
@@ -55,7 +59,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
       console.log(blockType);
     }
     const blockDefinition = state.definitions.blocks[blockType];
-    if (!blockDefinition) return;
+    if (!blockDefinition || addLocked) return;
 
     // Use generateDefaultData function if available, otherwise fall back to defaultData
     const blockData = blockDefinition.generateDefaultData 
@@ -98,6 +102,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
   ) => {
     if (activeIndex === overIndex) return;
     const newItems = arrayMove(data.items || [], activeIndex, overIndex);
+    if (!isOrderChangeAllowed(data.items, newItems)) return;
     onUpdate({
       ...data,
       items: newItems,
@@ -189,6 +194,11 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
             {/* Menu to add new blocks */}
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2">Add Item</h4>
+              {addLocked && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  This page ends inside a locked path, so a block added here would split the path.
+                </p>
+              )}
               {(() => {
                 // Separate blocks into default and custom
                 const defaultBlocks = Object.entries(state.definitions.blocks).filter(
@@ -219,6 +229,7 @@ export const ContentBlockPage: React.FC<ContentBlockPageProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => handleAddBlockItem(type)}
+                    disabled={addLocked}
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData("application/x-block-type", type);

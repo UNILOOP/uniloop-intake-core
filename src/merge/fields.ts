@@ -45,7 +45,7 @@ export function categorizeKey(key: string, sample: unknown): ChangeCategory {
   if (key === 'validationRules' || VALIDATION_KEYS.includes(key)) return 'validation';
   if (VISIBILITY_KEYS.includes(key)) return 'visibility';
   if (key === 'abTest') return 'abTest';
-  if (key === 'locked') return 'lock';
+  if (key === 'locked' || key === 'lockGroup') return 'lock';
   if (OPTION_KEYS.includes(key)) return 'options';
   if (typeof sample === 'string' && TEXTY.test(key) && !NOT_TEXT.has(key)) return 'text';
   return 'settings';
@@ -133,7 +133,9 @@ export function diffBlockFields(match: BlockMatch, entryKey: string, context: Fi
   const base = match.base?.block;
   const isPage = match.current!.isPage;
   const definition = context.definitions[incoming.type] ?? context.definitions[current.type];
-  const lockedPath = (path: string) => incoming.locked === true && isBlockPathLocked(incoming, definition, path);
+  // A path group the incoming side set keeps its blocks, whatever their own lock leaves editable.
+  const lockedPath = (path: string) =>
+    (path === 'lockGroup' && !!incoming.lockGroup) || (incoming.locked === true && isBlockPathLocked(incoming, definition, path));
   const kind = isPage ? 'page-field' : 'block-field';
   const hunks: MergeHunk[] = [];
 

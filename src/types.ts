@@ -754,6 +754,19 @@ export interface ABTestConfig {
 }
 
 
+/**
+ * A block's place in a path group. `id` is the uuid of the group's first block.
+ * `root` and `member` blocks are locked; an `orderFixed` block (where the
+ * group's paths join, or a neighbour that runs into or out of it) stays
+ * editable but can't be removed or moved, and nothing can be inserted next to it.
+ */
+export interface LockGroup {
+  id: string;
+  role: 'root' | 'member' | 'orderFixed';
+  /** The block was locked before the group locked it, so it stays locked when the group is released. */
+  wasLocked?: boolean;
+}
+
 export interface BlockData {
   type: string;
   name?: string;
@@ -787,6 +800,8 @@ export interface BlockData {
    * settings change as its definition's `lockAccess` allows.
    */
   locked?: boolean;
+  /** The path group this block belongs to, set by "Lock its path" on the group's first block. */
+  lockGroup?: LockGroup;
   /** Explicitly define the next block to navigate to (overrides sequential flow) */
   nextBlockId?: string;
   /**

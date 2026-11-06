@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useSurveyBuilder } from "../../../context/SurveyBuilderContext";
 import { NodeData, BlockData } from "../../../types";
 import { containsLockedBlock } from "../../../utils/blockLock";
+import { isOrderChangeAllowed } from "../../../utils/pathGroupLock";
 import {
   Root as Sortable,
   Content as SortableContent,
@@ -101,6 +102,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   ) => {
     if (activeIndex === overIndex) return;
     const newItems = arrayMove(data.items || [], activeIndex, overIndex);
+    if (!isOrderChangeAllowed(data.items, newItems)) return;
     onUpdate({
       ...data,
       items: newItems,
@@ -139,6 +141,8 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
       // Append to end
       newItems = [...currentItems, newBlock];
     }
+    // A block added between two blocks of a locked path would change the path
+    if (!isOrderChangeAllowed(currentItems, newItems)) return;
 
     onUpdate({
       ...data,
@@ -170,6 +174,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
   ) => {
     if (activeIndex === overIndex) return;
     const newItems = arrayMove(data.items || [], activeIndex, overIndex);
+    if (!isOrderChangeAllowed(data.items, newItems)) return;
     onUpdate({
       ...data,
       items: newItems,
@@ -226,7 +231,7 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
     );
 
     return (
-      <div className="w-56 flex-shrink-0 rounded-xl border-1 bg-muted/30 p-3 overflow-y-auto max-h-[70vh] sticky top-0">
+      <div className="w-full md:w-56 flex-shrink-0 rounded-xl border-1 bg-muted/30 p-3 overflow-y-auto max-h-[70vh] md:sticky md:top-0">
         <h4 className="text-sm font-semibold mb-3">Add Block</h4>
 
         {hasCustomBlocks ? (
@@ -345,8 +350,12 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
                     />
                   </div>
                 </SortableItem>
-                {/* Drop zone after each block */}
-                <DropZone index={index + 1} isActive={dragOverIndex === index + 1} />
+                {/* Drop zone after each block, except inside a locked path */}
+                {block.lockGroup && block.lockGroup.id === items[index + 1]?.lockGroup?.id ? (
+                  <div className="h-2" />
+                ) : (
+                  <DropZone index={index + 1} isActive={dragOverIndex === index + 1} />
+                )}
               </Fragment>
             ))}
           </SortableContent>
@@ -382,7 +391,8 @@ export const SectionNode: React.FC<SectionNodeProps> = ({
 
   // Render blocks content with sidebar (for pageless mode)
   const renderBlocksContent = () => (
-    <div className="flex gap-4">
+    // Below md the block list takes the full width and the sidebar follows it
+    <div className="flex flex-col md:flex-row gap-4">
       {/* Main blocks list */}
       {renderBlocksList()}
 

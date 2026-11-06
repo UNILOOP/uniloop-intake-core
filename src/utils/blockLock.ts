@@ -1,4 +1,5 @@
 import type { BlockData, BlockDefinition, NodeData } from '../types';
+import { assertPathGroupsPreserved, isPathGroupLocked } from './pathGroupLock';
 
 // A locked block never changes type, identity, or saved field mappings, whatever its lockAccess says.
 // Its A/B test is fixed too: each variant holds a full copy of the block, and at
@@ -10,6 +11,10 @@ const NEXT_STEP_PATHS = ['nextBlockId', 'isEndBlock', 'isEndBlockManual'];
 
 export const isBlockLocked = (block: BlockData | NodeData | null | undefined): boolean =>
   block?.locked === true;
+
+/** Whether the builder refuses to remove the block: it is locked, or a path group holds it. */
+export const isBlockRemovalLocked = (block: BlockData | NodeData | null | undefined): boolean =>
+  isBlockLocked(block) || !!block?.lockGroup;
 
 // 'options[].value' and 'options[2].value' both become ['options', '[]', 'value'].
 const toSegments = (path: string): string[] =>
@@ -93,13 +98,16 @@ export function isBlockLinkLocked(
  * Whether the builder may replace `prev` with `next`. An unlocked block can
  * change freely. A locked block can only change where its definition's
  * `lockAccess` leaves a setting editable, and the lock flag itself can always
- * be switched.
+ * be switched, except on a block a path group locks. A block's path group
+ * changes only through `lockPathGroup` and `releasePathGroup`.
  */
 export function isBlockUpdateAllowed(
   prev: BlockData,
   next: BlockData,
   definition: BlockDefinition | undefined
 ): boolean {
+  if (JSON.stringify(prev.lockGroup) !== JSON.stringify(next.lockGroup)) return false;
+  if (isPathGroupLocked(prev) && next.locked !== true) return false;
   if (!isBlockLocked(prev)) return true;
   const changes: string[][] = [];
   collectChanges({ ...prev, locked: undefined }, { ...next, locked: undefined }, [], changes);
@@ -109,10 +117,10 @@ export function isBlockUpdateAllowed(
   return changes.every((change) => !locked.some((lockedPath) => overlaps(change, lockedPath)));
 }
 
-/** Whether a page or section holds a locked block, so removing it would delete one. */
+/** Whether a page or section holds a block the builder won't remove: a locked one, or one a path group holds. */
 export function containsLockedBlock(node: BlockData | NodeData | null | undefined): boolean {
   if (!node) return false;
-  if (isBlockLocked(node)) return true;
+  if (isBlockRemovalLocked(node)) return true;
   if (node.items?.some((item: BlockData) => containsLockedBlock(item))) return true;
   return (node.nodes || []).some(
     (child: NodeData | string) => typeof child !== 'string' && containsLockedBlock(child)
@@ -143,4 +151,5 @@ export function assertLockedBlocksPreserved(
       throw new Error('This import changes or removes a locked block. Keep locked blocks, their field names, answer values, and answer types unchanged.');
     }
   }
+  assertPathGroupsPreserved(previous, next);
 }

@@ -1,8 +1,9 @@
 import type { MergeDecisions, MergeHunk, MergeSide, SurveyDiff } from './types';
 
-/** The side a hunk takes: its lock, then the explicit decision, then its default. */
+/** The side a hunk takes: its lock, then the explicit decision, then its default. A forced hunk is incoming only once taken. */
 export function resolveDecision(hunk: MergeHunk, decisions: MergeDecisions = {}): MergeSide {
   if (hunk.locked) return 'incoming';
+  if (hunk.forced) return decisions[hunk.id] === 'incoming' ? 'incoming' : 'current';
   return decisions[hunk.id] ?? hunk.defaultDecision;
 }
 
@@ -11,11 +12,11 @@ export function defaultDecisions(diff: Pick<SurveyDiff, 'hunks'>): MergeDecision
   return Object.fromEntries(diff.hunks.map((hunk) => [hunk.id, hunk.locked ? 'incoming' : hunk.defaultDecision]));
 }
 
-/** Decisions that take `side` for every hunk the filter accepts (locked hunks stay incoming). */
+/** Decisions that take `side` for every hunk the filter accepts (locked hunks stay incoming, forced ones can't be kept). */
 export function bulkDecisions(diff: Pick<SurveyDiff, 'hunks'>, side: MergeSide, filter: (hunk: MergeHunk) => boolean = () => true): MergeDecisions {
   const decisions: MergeDecisions = {};
   for (const hunk of diff.hunks) {
-    if (hunk.locked || !filter(hunk)) continue;
+    if (hunk.locked || (hunk.forced && side === 'current') || !filter(hunk)) continue;
     decisions[hunk.id] = side;
   }
   return decisions;
@@ -93,4 +94,9 @@ export function cascadeDecision(diff: SurveyDiff, hunkId: string, side: MergeSid
 /** Conflicts the user has not decided on explicitly. */
 export function unresolvedConflicts(diff: Pick<SurveyDiff, 'hunks'>, decisions: MergeDecisions = {}): MergeHunk[] {
   return diff.hunks.filter((hunk) => hunk.conflict && !hunk.locked && decisions[hunk.id] === undefined);
+}
+
+/** Forced hunks the user has not taken yet; the merge can't be applied while any remain. */
+export function pendingForced(diff: Pick<SurveyDiff, 'hunks'>, decisions: MergeDecisions = {}): MergeHunk[] {
+  return diff.hunks.filter((hunk) => hunk.forced && decisions[hunk.id] !== 'incoming');
 }

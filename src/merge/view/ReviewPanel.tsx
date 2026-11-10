@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, GitMerge, Info } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/utils';
+import { pendingForced } from '../decisions';
 import type { BlockDiffEntry, MergeDecisions, MergeIssue, SurveyDiff } from '../types';
 import { BlockInspector } from './BlockInspector';
 import { ChangeList, matchesFilter, type ChangeFilter } from './ChangeList';
@@ -44,7 +45,8 @@ export const IssueList = ({ issues }: { issues: MergeIssue[] }) =>
 export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selected, showList, onApply, applyLabel, applying }: ReviewPanelProps) => {
   const { labels, readOnly } = useMergeActions();
   const decidable = diff.hunks.filter((hunk) => !hunk.locked);
-  const reviewed = decidable.filter((hunk) => decisions[hunk.id] !== undefined).length;
+  const reviewed = decidable.filter((hunk) => (hunk.forced ? decisions[hunk.id] === 'incoming' : decisions[hunk.id] !== undefined)).length;
+  const required = pendingForced(diff, decisions).length;
   const conflicts = decidable.filter((hunk) => hunk.conflict);
   const unresolved = conflicts.filter((hunk) => decisions[hunk.id] === undefined).length;
   const errors = issues.filter((issue) => issue.level === 'error').length;
@@ -52,6 +54,7 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
   const count = (candidate: ChangeFilter) => diff.hunks.filter((hunk) => matchesFilter(hunk, candidate, blockHunkIds.has(hunk.id))).length;
   const chips: Array<{ id: ChangeFilter; label: string }> = [
     { id: 'all', label: 'All' },
+    { id: 'required', label: 'Required' },
     { id: 'conflicts', label: 'Conflicts' },
     { id: 'added', label: 'New' },
     { id: 'removed', label: 'Removed' },
@@ -79,6 +82,12 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
                 <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
               </div>
+            )}
+            {required > 0 && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="h-3.5 w-3.5" />{' '}
+                {required === 1 ? `1 required change from ${labels.incoming} to take` : `${required} required changes from ${labels.incoming} to take`}
+              </p>
             )}
             {unresolved > 0 ? (
               <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -147,7 +156,7 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
       <footer className="space-y-2 border-t border-slate-200 p-3 dark:border-slate-700">
         <IssueList issues={issues} />
         {onApply && (
-          <Button type="button" className="w-full" size="lg" disabled={readOnly || applying || errors > 0} onClick={onApply}>
+          <Button type="button" className="w-full" size="lg" disabled={readOnly || applying || errors > 0 || required > 0} onClick={onApply}>
             <GitMerge className="mr-2 h-4 w-4" /> {applying ? 'Applying…' : applyLabel ?? 'Apply merge'}
           </Button>
         )}
@@ -155,7 +164,9 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
           <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
             {errors > 0
               ? 'Fix the problems above before applying.'
-              : unresolved > 0
+              : required > 0
+                ? `Take every required change from ${labels.incoming} before applying.`
+                : unresolved > 0
                 ? `You can apply now; undecided conflicts keep ${labels.current}.`
                 : diff.hunks.length === 0
                   ? `Applying only records that ${labels.current} matches ${labels.incoming}.`

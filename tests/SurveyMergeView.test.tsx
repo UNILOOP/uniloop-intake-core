@@ -102,4 +102,60 @@ describe('SurveyMergeView', () => {
     expect(take.disabled).toBe(true);
     expect(decisions).toHaveLength(0);
   });
+
+  test('a forced options change must be taken before the merge can be applied', async () => {
+    const current = survey([radio('a', 'smoker', { label: 'Smoker?' })]);
+    const incoming = survey([
+      radio('a', 'smoker', {
+        label: 'Do you smoke?',
+        options: [
+          { label: 'Yes', value: 'yes' },
+          { label: 'No', value: 'no' },
+          { label: 'Not sure', value: 'unsure' },
+        ],
+      }),
+    ]);
+    const applied: SurveySnapshot[] = [];
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root!.render(
+        <SurveyMergeView
+          current={current}
+          incoming={incoming}
+          blockDefinitions={[]}
+          initialTab="changes"
+          labels={{ current: 'your form', incoming: 'UniEMR' }}
+          forceIncoming={['options']}
+          onApply={(merged) => {
+            applied.push(merged);
+          }}
+        />
+      );
+    });
+    const applyButton = () => Array.from(container!.querySelectorAll('button')).find((button) => button.textContent?.includes('Apply merge')) as HTMLButtonElement;
+
+    expect(container.textContent).toContain('1 required change from UniEMR to take');
+    expect(container.textContent).toContain('Required');
+    expect(buttonNamed('Keep for Options').disabled).toBe(true);
+    expect(applyButton().disabled).toBe(true);
+    click(applyButton());
+    expect(applied).toHaveLength(0);
+
+    // Keeping everything leaves the required change untaken
+    const keepAll = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Keep everything'));
+    click(keepAll!);
+    expect(applyButton().disabled).toBe(true);
+
+    click(buttonNamed('Use for Options'));
+    expect(container.textContent).not.toContain('required change');
+    expect(applyButton().disabled).toBe(false);
+    await act(async () => {
+      applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(applied).toHaveLength(1);
+    expect(applied[0].rootNode.items![0].options).toHaveLength(3);
+    expect(applied[0].rootNode.items![0].label).toBe('Smoker?');
+  });
 });

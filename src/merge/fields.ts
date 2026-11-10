@@ -75,6 +75,7 @@ export interface FieldContext {
   incomingBlocks: BlockData[];
   currentPages: BlockData[];
   incomingPages: BlockData[];
+  forceIncoming?: ChangeCategory[];
 }
 
 export const navRuleKey = (rule: NavigationRule): string =>
@@ -143,13 +144,15 @@ export function diffBlockFields(match: BlockMatch, entryKey: string, context: Fi
   ) => {
     const origin = originOf(partial.current, partial.incoming, partial.base, context.hasBase && (base !== undefined));
     const locked = lockPaths.some(lockedPath);
+    const forced = !locked && (context.forceIncoming?.includes(partial.category) ?? false);
     hunks.push({
       kind,
       blockKey: entryKey,
       origin,
-      conflict: origin === 'both',
+      conflict: origin === 'both' && !forced,
       locked,
-      defaultDecision: defaultFor(origin, locked),
+      forced,
+      defaultDecision: forced ? 'current' : defaultFor(origin, locked),
       ...partial,
     });
   };

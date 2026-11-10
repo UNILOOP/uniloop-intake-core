@@ -19,7 +19,7 @@ export { diffSurveys, unionOrder } from './diff';
 export { applyMergeDecisions } from './merge';
 export { validateMergedSurvey, LOCKED_IDENTITY_KEYS } from './validate';
 export { summarizeDiff, describeSummary } from './summary';
-export { resolveDecision, defaultDecisions, bulkDecisions, cascadeDecision, unresolvedConflicts } from './decisions';
+export { resolveDecision, defaultDecisions, bulkDecisions, cascadeDecision, unresolvedConflicts, pendingForced } from './decisions';
 export { blockTitle, optionList, describeOptions, optionsChangeText, describeNavRule, keyLabel } from './describe';
 export type { OptionItem, OptionsChange } from './describe';
 export { collectSurvey, flatBlocks, ROOT_KEY } from './collect';

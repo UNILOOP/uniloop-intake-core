@@ -4,7 +4,7 @@ import type { BlockDefinition } from '../../types';
 import { cascadeDecision, resolveDecision } from '../decisions';
 import { diffSurveys } from '../diff';
 import { applyMergeDecisions } from '../merge';
-import type { MergeDecisions, MergeHunk, MergeIssue, MergeSide, SurveyDiff, SurveySnapshot } from '../types';
+import type { ChangeCategory, MergeDecisions, MergeHunk, MergeIssue, MergeSide, SurveyDiff, SurveySnapshot } from '../types';
 import { validateMergedSurvey } from '../validate';
 
 export interface UseSurveyMergeOptions {
@@ -13,6 +13,8 @@ export interface UseSurveyMergeOptions {
   base?: SurveySnapshot | null;
   blockDefinitions?: BlockDefinition[];
   themeDefault?: 'auto' | 'current';
+  /** Change categories the user must take from the incoming side, e.g. `['options']` */
+  forceIncoming?: ChangeCategory[];
   /** Controlled decisions; leave undefined to let the hook keep them */
   decisions?: MergeDecisions;
   initialDecisions?: MergeDecisions;
@@ -50,13 +52,21 @@ function useStableRecord(value: MergeDecisions | undefined): MergeDecisions | un
 /** The diff, decisions and merged result for one pair of surveys. */
 export function useSurveyMerge(options: UseSurveyMergeOptions): SurveyMergeState {
   const { current, incoming, base, blockDefinitions, themeDefault, onDecisionsChange, onMergedChange } = options;
+  // Keyed by content so an inline array doesn't rebuild the diff every render
+  const forceKey = (options.forceIncoming ?? []).join(',');
   const definitions = useMemo(() => {
     const list = blockDefinitions ?? getAllBlockDefinitions();
     return Object.fromEntries(list.map((definition) => [definition.type, definition]));
   }, [blockDefinitions]);
   const diff = useMemo(
-    () => diffSurveys(current, incoming, { base: base ?? undefined, definitions, themeDefault }),
-    [current, incoming, base, definitions, themeDefault]
+    () =>
+      diffSurveys(current, incoming, {
+        base: base ?? undefined,
+        definitions,
+        themeDefault,
+        forceIncoming: forceKey ? (forceKey.split(',') as ChangeCategory[]) : undefined,
+      }),
+    [current, incoming, base, definitions, themeDefault, forceKey]
   );
 
   const controlled = options.decisions !== undefined;

@@ -1,8 +1,8 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import type { BlockDefinition } from '../../types';
-import { bulkDecisions } from '../decisions';
-import type { MergeDecisions, MergeIssue, MergeSide, SurveyDiff, SurveySnapshot } from '../types';
+import { bulkDecisions, pendingForced } from '../decisions';
+import type { ChangeCategory, MergeDecisions, MergeIssue, MergeSide, SurveyDiff, SurveySnapshot } from '../types';
 import { ChangeList, type ChangeFilter } from './ChangeList';
 import { MergeActionsContext, type HighlightedPath, type MergeLabels } from './MergeContext';
 import { MergeLegend } from './MergeLegend';
@@ -35,6 +35,12 @@ export interface SurveyMergeViewProps {
   applying?: boolean;
   readOnly?: boolean;
   themeDefault?: 'auto' | 'current';
+  /**
+   * Change categories the user must take from the incoming side, e.g. `['options']` when
+   * the incoming form comes from the EMR. Each one starts unapplied, can't be kept, and
+   * Apply stays disabled until all of them are taken.
+   */
+  forceIncoming?: ChangeCategory[];
   initialTab?: MergeView;
   className?: string;
   /** Rendered above the top bar, e.g. a version switcher */
@@ -62,6 +68,7 @@ export const SurveyMergeView = ({
   applying = false,
   readOnly = false,
   themeDefault = 'auto',
+  forceIncoming,
   initialTab = 'compare',
   className,
   header,
@@ -73,6 +80,7 @@ export const SurveyMergeView = ({
     base,
     blockDefinitions,
     themeDefault,
+    forceIncoming,
     decisions: controlledDecisions,
     initialDecisions,
     onDecisionsChange,
@@ -113,7 +121,10 @@ export const SurveyMergeView = ({
   );
   const selected = useMemo(() => (selectedKey ? (diff.blocks.find((entry) => entry.key === selectedKey) ?? null) : null), [diff, selectedKey]);
   const onBulk = useCallback((side: MergeSide) => setMany(bulkDecisions(diff, side)), [diff, setMany]);
-  const apply = useCallback(() => onApply?.(merged, decisions, diff), [onApply, merged, decisions, diff]);
+  const apply = useCallback(() => {
+    if (pendingForced(diff, decisions).length > 0) return;
+    return onApply?.(merged, decisions, diff);
+  }, [onApply, merged, decisions, diff]);
 
   return (
     <MergeActionsContext.Provider value={actions}>

@@ -88,6 +88,11 @@ export interface MergeHunk {
   conflict: boolean;
   /** Forced to incoming by the block's lock; the decision can't be flipped */
   locked: boolean;
+  /**
+   * Must end up incoming, but only once the user takes it: it starts on the current
+   * side, can't be kept, and the merge can't be applied until it is taken.
+   */
+  forced?: boolean;
   defaultDecision: MergeSide;
   meta?: HunkMeta;
 }
@@ -135,6 +140,7 @@ export interface DiffSummary {
   unchanged: number;
   conflicts: number;
   locked: number;
+  forced: number;
   hunks: number;
   byCategory: Partial<Record<ChangeCategory, number>>;
 }
@@ -168,4 +174,6 @@ export interface DiffOptions {
   definitions?: Record<string, BlockDefinition>;
   /** `current` keeps the current theme by default whatever changed; `auto` follows the origin */
   themeDefault?: 'auto' | 'current';
+  /** Change categories the user must take from the incoming side, e.g. `['options']` for a form from the EMR */
+  forceIncoming?: ChangeCategory[];
 }

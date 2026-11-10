@@ -81,6 +81,7 @@ export function diffSurveys(current: SurveySnapshot, incoming: SurveySnapshot, o
     incomingBlocks: locationsIn(collectedIncoming.blocks, false),
     currentPages: locationsIn(collectedCurrent.blocks, true),
     incomingPages: locationsIn(collectedIncoming.blocks, true),
+    forceIncoming: options.forceIncoming,
   };
 
   const entries: BlockDiffEntry[] = [];
@@ -360,7 +361,7 @@ export function diffSurveys(current: SurveySnapshot, incoming: SurveySnapshot, o
     blocks: ordered,
     containers,
     hunks,
-    summary: { added: 0, removed: 0, changed: 0, moved: 0, unchanged: 0, conflicts: 0, locked: 0, hunks: 0, byCategory: {} },
+    summary: { added: 0, removed: 0, changed: 0, moved: 0, unchanged: 0, conflicts: 0, locked: 0, forced: 0, hunks: 0, byCategory: {} },
   };
   diff.summary = summarizeDiff(diff);
   return diff;

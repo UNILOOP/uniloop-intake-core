@@ -9,6 +9,7 @@ export function summarizeDiff(diff: Pick<SurveyDiff, 'blocks' | 'hunks'>): DiffS
     unchanged: 0,
     conflicts: 0,
     locked: 0,
+    forced: 0,
     hunks: diff.hunks.length,
     byCategory: {},
   };
@@ -16,6 +17,7 @@ export function summarizeDiff(diff: Pick<SurveyDiff, 'blocks' | 'hunks'>): DiffS
   for (const hunk of diff.hunks) {
     if (hunk.conflict) summary.conflicts += 1;
     if (hunk.locked) summary.locked += 1;
+    if (hunk.forced) summary.forced += 1;
     summary.byCategory[hunk.category] = (summary.byCategory[hunk.category] ?? 0) + 1;
   }
   return summary;

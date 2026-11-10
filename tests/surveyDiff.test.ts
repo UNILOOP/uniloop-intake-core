@@ -6,6 +6,7 @@ import {
   describeSummary,
   diffSurveys,
   diffWords,
+  pendingForced,
   resolveDecision,
   unresolvedConflicts,
   validateMergedSurvey,
@@ -429,4 +430,74 @@ test('declining a new section preserves existing block placement and suppresses 
   };
   const diff = diffSurveys(current, incoming, { base: current });
   expect(applyMergeDecisions(diff, { 'section:new:add': 'current' })).toEqual(current);
+});
+
+describe('forced incoming changes', () => {
+  const brandOptions = [
+    { label: 'Yes', value: 'yes' },
+    { label: 'No', value: 'no' },
+  ];
+  const emrOptions = [...brandOptions, { label: 'Not sure', value: 'unsure' }];
+
+  test('an options change in a forced category starts unapplied and has no conflict to decide', () => {
+    const base = survey([radio('a', 'smoker')]);
+    const current = survey([radio('a', 'smoker', { options: [{ label: 'Yep', value: 'yes' }] })]);
+    const incoming = survey([radio('a', 'smoker', { options: emrOptions, label: 'Do you smoke?' })]);
+    const diff = diffSurveys(current, incoming, { base, forceIncoming: ['options'] });
+    expect(hunk(diff, 'a:options')).toMatchObject({ forced: true, conflict: false, defaultDecision: 'current' });
+    expect(hunk(diff, 'a:key:label')?.forced).toBe(false);
+    expect(diff.summary.forced).toBe(1);
+    expect(unresolvedConflicts(diff)).toEqual([]);
+    expect(pendingForced(diff).map((candidate) => candidate.id)).toEqual(['a:options']);
+    expect(items(applyMergeDecisions(diff))[0].options).toEqual([{ label: 'Yep', value: 'yes' }]);
+  });
+
+  test('taking a forced change applies it, and keeping it is ignored', () => {
+    const current = survey([radio('a', 'smoker')]);
+    const incoming = survey([radio('a', 'smoker', { options: emrOptions })]);
+    const diff = diffSurveys(current, incoming, { forceIncoming: ['options'] });
+    const forced = hunk(diff, 'a:options')!;
+    expect(resolveDecision(forced, { 'a:options': 'current' })).toBe('current');
+    expect(pendingForced(diff, { 'a:options': 'current' })).toHaveLength(1);
+    expect(pendingForced(diff, { 'a:options': 'incoming' })).toEqual([]);
+    expect(items(applyMergeDecisions(diff, { 'a:options': 'incoming' }))[0].options).toEqual(emrOptions);
+  });
+
+  test('a bulk keep leaves taken forced changes taken', () => {
+    const current = survey([radio('a', 'smoker')]);
+    const incoming = survey([radio('a', 'smoker', { options: emrOptions, label: 'Smoke?' })]);
+    const diff = diffSurveys(current, incoming, { forceIncoming: ['options'] });
+    const keep = bulkDecisions(diff, 'current');
+    expect(keep).toEqual({ 'a:key:label': 'current' });
+    expect(bulkDecisions(diff, 'incoming')).toEqual({ 'a:options': 'incoming', 'a:key:label': 'incoming' });
+  });
+
+  test('without forceIncoming the same change is an ordinary decision', () => {
+    const current = survey([radio('a', 'smoker')]);
+    const incoming = survey([radio('a', 'smoker', { options: emrOptions })]);
+    const diff = diffSurveys(current, incoming);
+    expect(hunk(diff, 'a:options')?.forced).toBe(false);
+    expect(diff.summary.forced).toBe(0);
+    expect(pendingForced(diff)).toEqual([]);
+  });
+
+  test('a block matched by field name with a different block type still gets forced options', () => {
+    const current = survey([radio('brand-a', 'smoker', { type: 'ivyRadio' })]);
+    const incoming = survey([radio('emr-a', 'smoker', { options: emrOptions })]);
+    const diff = diffSurveys(current, incoming, { forceIncoming: ['options'] });
+    const entry = diff.blocks.find((candidate) => candidate.fieldName === 'smoker')!;
+    expect(entry.matchedBy).toBe('fieldName');
+    expect(entry.hunks.find((candidate) => candidate.category === 'options')?.forced).toBe(true);
+  });
+
+  test("a provider-locked block's options stay locked rather than forced", () => {
+    const current = survey([radio('a', 'smoker')]);
+    const incoming = survey([radio('a', 'smoker', { options: emrOptions, locked: true })]);
+    const definitions: Record<string, BlockDefinition> = {
+      radio: { type: 'radio', name: 'Radio', lockAccess: { locked: ['options'] } } as unknown as BlockDefinition,
+    };
+    const diff = diffSurveys(current, incoming, { definitions, forceIncoming: ['options'] });
+    expect(hunk(diff, 'a:options')).toMatchObject({ locked: true, forced: false });
+    expect(pendingForced(diff)).toEqual([]);
+  });
 });

@@ -7,12 +7,14 @@ import { HunkRow } from './HunkRow';
 import { useMergeActions } from './MergeContext';
 import { NODE_STATUS_CLASSES, NODE_STATUS_LABEL } from './status';
 
-export type ChangeFilter = 'all' | 'conflicts' | 'added' | 'removed' | 'edited' | 'form';
+export type ChangeFilter = 'all' | 'required' | 'conflicts' | 'added' | 'removed' | 'edited' | 'form';
 
 export const matchesFilter = (hunk: MergeHunk, filter: ChangeFilter, blockLevel: boolean): boolean => {
   switch (filter) {
     case 'all':
       return true;
+    case 'required':
+      return hunk.forced === true;
     case 'conflicts':
       return hunk.conflict;
     case 'added':

@@ -40,12 +40,18 @@ interface YesNoAnswerState {
   details: string;
 }
 
+// New blocks start with neutral text, like the Selectable Box Question, so no
+// brand inherits another brand's question.
 const DEFAULTS = {
-  label: 'Have you ever had weight loss surgery (bariatric or gastric)?',
-  detailsPrompt:
-    "Please list your weight loss surgery(s) and the date(s). Don't worry about typos.",
+  label: 'Select an option',
   detailsPlaceholder: 'Type your answer here',
   buttonText: 'Next',
+};
+
+// Examples shown only as placeholders in the block's settings.
+const EXAMPLES = {
+  label: 'e.g. Have you ever had surgery?',
+  detailsPrompt: 'e.g. Please list the surgeries and their dates.',
 };
 
 // Long enough for the patient to see the selection before the step changes.
@@ -337,7 +343,7 @@ const YesNoAnswerBlockForm: React.FC<ContentBlockItemProps> = ({
 
   return (
     <div className="space-y-4">
-      {textField('label', 'Question Label', DEFAULTS.label)}
+      {textField('label', 'Question Label', EXAMPLES.label)}
 
       <div className="space-y-2">
         <Label className="text-sm" htmlFor="description">
@@ -377,7 +383,7 @@ const YesNoAnswerBlockForm: React.FC<ContentBlockItemProps> = ({
             id="detailsPrompt"
             value={data.detailsPrompt || ''}
             onChange={(e) => handleChange('detailsPrompt', e.target.value)}
-            placeholder={DEFAULTS.detailsPrompt}
+            placeholder={EXAMPLES.detailsPrompt}
             rows={2}
           />
         </div>
@@ -409,17 +415,62 @@ const YesNoAnswerBlockForm: React.FC<ContentBlockItemProps> = ({
   );
 };
 
-const YesNoAnswerBlockItem: React.FC<ContentBlockItemProps> = ({ data }) => (
-  <Card className="space-y-3 p-4">
-    <YesNoAnswerUi
-      data={data}
-      state={{ choice: YES, details: '' }}
-      theme={themes.default}
-      showButton={data.showContinueButton === false}
-      disabled
-    />
-  </Card>
-);
+// The builder card is drawn like the Selectable Box Question's card: the question,
+// then the two answers as plain boxes. The details box only shows to patients.
+const YesNoAnswerBlockItem: React.FC<ContentBlockItemProps> = ({ data }) => {
+  const [selected, setSelected] = useState<Choice | ''>('');
+  const idPrefix = useId();
+  const choices = [
+    { choice: NO, label: getNoLabel(data) },
+    { choice: YES, label: getYesLabel(data) },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {data.label && <h3 className="text-2xl font-bold">{data.label}</h3>}
+
+      {data.description && (
+        <p className="text-sm text-muted-foreground">{data.description}</p>
+      )}
+
+      <RadioGroup
+        value={selected}
+        onValueChange={(choice) => setSelected(choice as Choice)}
+        className="space-y-4"
+      >
+        {choices.map(({ choice, label }) => {
+          const id = `${idPrefix}-${choice}`;
+          const isSelected = selected === choice;
+
+          return (
+            <div key={choice} className="relative">
+              <RadioGroupItem value={choice} id={id} className="sr-only" />
+              <Label htmlFor={id} className="block w-full cursor-pointer">
+                <Card
+                  className={cn(
+                    'p-4 transition-colors',
+                    isSelected
+                      ? 'border-primary bg-primary/5 dark:bg-primary/20'
+                      : 'hover:bg-accent dark:hover:bg-accent/50',
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-foreground">{label}</span>
+                    {isSelected && (
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <CheckSquare className="h-3 w-3" />
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </Label>
+            </div>
+          );
+        })}
+      </RadioGroup>
+    </div>
+  );
+};
 
 const YesNoAnswerBlockPreview: React.FC = () => (
   <div className="w-full space-y-2 py-1">
@@ -533,7 +584,7 @@ const createDefaultData = (fieldName: string): BlockData => ({
   description: '',
   noLabel: NO,
   yesLabel: YES,
-  detailsPrompt: DEFAULTS.detailsPrompt,
+  detailsPrompt: '',
   detailsPlaceholder: DEFAULTS.detailsPlaceholder,
   detailsRequired: true,
   buttonText: DEFAULTS.buttonText,

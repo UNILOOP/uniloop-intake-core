@@ -1188,6 +1188,31 @@ interface ThemeDefinition {
 }
 ```
 
+#### Consents
+```tsx
+{
+  type: "consentAcknowledgements",
+  fieldName: "consents",
+  label: "Please review and acknowledge",
+  masterLabel: "I acknowledge all of the information below.", // Checks every shown item
+  acknowledgements: [
+    { id: "telehealth", accordionTitle: "Consent to Telehealth", content: "## Introduction\nText..." },
+    {
+      id: "pregnancy",
+      accordionTitle: "Pregnancy Precaution",
+      content: "Text...",
+      // Shown only when every condition matches; operators: equals, notEquals, contains
+      showIf: [{ field: "sexAtBirth", operator: "equals", value: "Female" }],
+    },
+  ],
+  required: true,
+  uuid: "consents-field"
+}
+// Saves { masterAcknowledged: true, items: { telehealth: true, pregnancy: true } },
+// with only the items the patient was shown. Each item's text opens and closes,
+// and a line starting with ## is a heading. autoSelect: true starts an item checked.
+```
+
 #### Select Dropdown
 ```tsx
 {
@@ -2728,6 +2753,7 @@ By default, a lock fixes every setting of the block. A block definition can leav
 | Radio Buttons, Dropdown Select, Checkbox | `['fieldName', 'options[].value']` |
 | Selectable Box Question | `['fieldName', 'options[].value', 'multiSelect']` |
 | Yes/No Answer (its values are always yes and no) | `['fieldName']` |
+| Consents (item ids are the keys of the answer) | `['fieldName', 'acknowledgements[].id']` |
 
 A change is refused when its path and a locked path overlap, so adding, removing or reordering options counts as a change to `options[].value`. Selectable Box Question also fixes `multiSelect`, because switching it turns the answer from a value into a list, and rules written for one shape don't match the other. A lock always fixes `type`, `uuid` and the block's A/B test, since each A/B variant holds a full copy of the block.
 

@@ -72,7 +72,7 @@ function buildRule(state: RuleState): NavigationRule {
     };
   }
   return {
-    condition: `${state.field} ${state.operator} ${JSON.stringify(state.value)}`,
+    condition: state.field.trim() ? `${state.field} ${state.operator} ${JSON.stringify(state.value)}` : '',
     target: state.target,
     isPage: state.isPage,
     isDefault: state.isDefault,

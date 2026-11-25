@@ -160,9 +160,44 @@ export function evaluateConditionRule(
   );
 }
 
-function evaluateNavigationalRule(conditionalRule: NavigationRule, currentValues: CurrentValues): EvaluationResult {
+function isIncompleteCondition(condition: string): boolean {
+  return condition === '' || /^(?:==|!=|[<>])/.test(condition);
+}
+
+type ConditionBlock = Partial<Pick<BlockData, 'uuid' | 'type' | 'fieldName' | 'label'>>;
+type ConditionSource =
+  | { block: ConditionBlock; kind: 'navigation'; ruleNumber: number; target: NavigationRule['target'] }
+  | { block: ConditionBlock; kind: 'visibility' };
+
+const reportedInvalidConditions = new WeakMap<ConditionBlock, Set<string>>();
+
+function warnInvalidCondition(source: ConditionSource, expression: string, reason: 'incomplete condition' | 'invalid syntax'): void {
+  const { block, ...rule } = source;
+  const key = JSON.stringify([rule, expression, reason]);
+  const reported = reportedInvalidConditions.get(block) ?? new Set<string>();
+  if (reported.has(key)) return;
+  reported.add(key);
+  reportedInvalidConditions.set(block, reported);
+
+  console.warn('[Survey] Invalid block rule', {
+    blockUuid: block.uuid,
+    blockType: block.type,
+    fieldName: block.fieldName,
+    blockLabel: block.label,
+    ...rule,
+    expression,
+    reason,
+  });
+}
+
+function evaluateNavigationalRule(conditionalRule: NavigationRule, currentValues: CurrentValues, source: ConditionSource): EvaluationResult {
   try {
-    const { condition, target, isPage } = conditionalRule;
+    const { target, isPage } = conditionalRule;
+    const condition = conditionalRule.condition.trim();
+    if (isIncompleteCondition(condition)) {
+      warnInvalidCondition(source, condition, 'incomplete condition');
+      return { matched: false, target: null, isPage: null };
+    }
     
     
     // Try to parse enhanced operators first
@@ -195,7 +230,8 @@ function evaluateNavigationalRule(conditionalRule: NavigationRule, currentValues
     };
     
   } catch (error) {
-    console.error('Error evaluating condition:', error);
+    if (error instanceof SyntaxError) warnInvalidCondition(source, conditionalRule.condition.trim(), 'invalid syntax');
+    else console.error('Error evaluating condition:', error);
     return {
       matched: false,
       target: null,
@@ -578,7 +614,8 @@ function evaluateNavigationalRuleSafe(conditionalRule: NavigationRule, currentVa
  */
 export function evaluateCondition(
   condition: string | ConditionRule | ConditionRule[],
-  fieldValues: Record<string, any>
+  fieldValues: Record<string, any>,
+  source?: ConditionSource
 ): boolean {
   // If condition is a string, evaluate it as a JavaScript expression
   if (typeof condition === 'string') {
@@ -598,6 +635,10 @@ export function evaluateCondition(
       const normalized = sanitizedCondition
         .replace(/^return\s+/i, '')
         .replace(/;?\s*$/,'');
+      if (isIncompleteCondition(normalized)) {
+        if (source) warnInvalidCondition(source, condition.trim(), 'incomplete condition');
+        return false;
+      }
 
       // Create a function that references values by using a parameter object instead of 'with'
       const conditionFn = new Function('values', `
@@ -616,7 +657,8 @@ export function evaluateCondition(
       // Execute the function with the field values
       return Boolean(conditionFn(fieldValues));
     } catch (error) {
-      console.error('Error parsing condition expression:', error);
+      if (source && error instanceof SyntaxError) warnInvalidCondition(source, condition.trim(), 'invalid syntax');
+      else console.error('Error parsing condition expression:', error);
       return false;
     }
   }
@@ -716,8 +758,8 @@ export function getNextPageFromNavigationRules(
 ): number | null {
   for (const block of blocks) {
     if (!block.navigationRules) continue;
-    for (const rule of block.navigationRules) {
-      if (evaluateCondition(rule.condition, fieldValues)) {
+    for (const [index, rule] of block.navigationRules.entries()) {
+      if (evaluateCondition(rule.condition, fieldValues, { block, kind: 'navigation', ruleNumber: index + 1, target: rule.target })) {
         if (rule.target === "submit") {
           return -1;
         }
@@ -763,9 +805,8 @@ export function getNextStepFromNavigationRules(
 ): { pageIndex: number; blockIndex: number } | 'submit' | null {
   if (!block.navigationRules) return null;
 
-  for (const rule of block.navigationRules) {
-    // evaluateNavigationalRule(rule, fieldValues)
-    const evaluate = evaluateNavigationalRule(rule, fieldValues);
+  for (const [index, rule] of block.navigationRules.entries()) {
+    const evaluate = evaluateNavigationalRule(rule, fieldValues, { block, kind: 'navigation', ruleNumber: index + 1, target: rule.target });
     if(evaluate.matched) {
       if (evaluate.target === 'submit') {
         return 'submit';
@@ -853,7 +894,7 @@ export function executeCalculation(
  * Evaluates if a block should be visible based on its visibility condition
  */
 export function isBlockVisible(
-  block: { visibleIf?: string | ConditionRule | ConditionRule[] },
+  block: ConditionBlock & { visibleIf?: string | ConditionRule | ConditionRule[] },
   fieldValues: Record<string, any>
 ): boolean {
   // If no visibility condition, the block is always visible
@@ -862,7 +903,7 @@ export function isBlockVisible(
   }
 
   // Evaluate the visibility condition
-  return evaluateCondition(block.visibleIf, fieldValues);
+  return evaluateCondition(block.visibleIf, fieldValues, { block, kind: 'visibility' });
 }
 
 /**

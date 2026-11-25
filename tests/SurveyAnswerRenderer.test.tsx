@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { registerBlock, unregisterBlock } from '../src/blocks';
+import { createBlockDefinitionScope, registerBlock, unregisterBlock } from '../src/blocks';
 import { SurveyAnswerRenderer, type SurveyAnswerRendererProps } from '../src/renderer/answers';
 import type { AnswerViewProps, BlockData, BlockDefinition } from '../src/types';
 
@@ -77,6 +77,20 @@ afterEach(() => {
 });
 
 describe('SurveyAnswerRenderer', () => {
+  test('uses host-supplied block scopes independently of the global registry', () => {
+    const first = createBlockDefinitionScope({
+      [symptomsBlock.type]: { ...symptomsBlock, answerView: () => <span>First saved answer</span> },
+    });
+    const second = createBlockDefinitionScope({
+      [symptomsBlock.type]: { ...symptomsBlock, answerView: () => <span>Second saved answer</span> },
+    });
+    const props = { form: [symptoms], answers: { symptoms: { frequency: 'daily' } } };
+
+    expect(render({ ...props, blockDefinitionScope: first })).toContain('First saved answer');
+    expect(render({ ...props, blockDefinitionScope: second })).toContain('Second saved answer');
+    expect(render(props)).toContain('Reported: daily');
+  });
+
   test('shows a registered block\'s answer view without blockDefinitions', () => {
     const text = render({ form: [symptoms], answers: { symptoms: { frequency: 'daily' } } });
     expect(text).toContain('Your symptoms');

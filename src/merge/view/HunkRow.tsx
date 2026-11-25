@@ -14,13 +14,13 @@ export const HunkRow = ({ hunk, showValues = false }: { hunk: MergeHunk; showVal
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg border px-3 py-2.5',
+        'flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2.5',
         hunk.conflict ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/20' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
       )}
       data-hunk-id={hunk.id}
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="min-w-0 flex-1 basis-32 space-y-1 break-words">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{hunk.label}</span>
           <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', ORIGIN_CLASSES[hunk.origin])}>{originText(hunk.origin, labels)}</span>
@@ -44,7 +44,7 @@ export const HunkRow = ({ hunk, showValues = false }: { hunk: MergeHunk; showVal
           </div>
         )}
       </div>
-      <DecisionToggle hunk={hunk} compact />
+      <DecisionToggle hunk={hunk} />
     </div>
   );
 };

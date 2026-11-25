@@ -1,5 +1,7 @@
+import { GitMerge } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { BlockDefinitionScope } from '../../blocks';
+import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/utils';
 import type { BlockDefinition } from '../../types';
 import { bulkDecisions } from '../decisions';
@@ -8,7 +10,7 @@ import { ChangeList, type ChangeFilter } from './ChangeList';
 import { MergeActionsContext, type HighlightedPath, type MergeLabels } from './MergeContext';
 import { MergeLegend } from './MergeLegend';
 import { MergeTopBar, type MergeView } from './MergeTopBar';
-import { ReviewPanel } from './ReviewPanel';
+import { IssueList, ReviewPanel } from './ReviewPanel';
 import { useSurveyMerge } from './useSurveyMerge';
 
 const MergeCanvas = lazy(() => import('./MergeCanvas').then((module) => ({ default: module.MergeCanvas })));
@@ -117,76 +119,101 @@ export const SurveyMergeView = ({
   const selected = useMemo(() => (selectedKey ? (diff.blocks.find((entry) => entry.key === selectedKey) ?? null) : null), [diff, selectedKey]);
   const onBulk = useCallback((side: MergeSide) => setMany(bulkDecisions(diff, side)), [diff, setMany]);
   const apply = useCallback(() => onApply?.(merged, decisions, diff), [onApply, merged, decisions, diff]);
+  const hasErrors = issues.some((issue) => issue.level === 'error');
+  const hasUnresolvedConflicts = diff.hunks.some((hunk) => !hunk.locked && hunk.conflict && decisions[hunk.id] === undefined);
 
   return (
     <MergeActionsContext.Provider value={actions}>
       <div className={cn('survey-merge flex h-full min-h-0 flex-col bg-background text-foreground', className)} data-mode={diff.mode}>
-        {header}
-        <MergeTopBar summary={diff.summary} mode={diff.mode} view={view} onView={setView} onBulk={onBulk} onReset={reset} />
-        {view === 'compare' && (
-          <div className="flex justify-end border-b border-slate-200 px-3 py-1 dark:border-slate-700">
-            <button
-              type="button"
-              className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-pressed={showCompareReview}
-              onClick={() => setShowCompareReview((visible) => !visible)}
-            >
-              {showCompareReview ? 'Hide review panel' : `Review changes (${diff.hunks.length})`}
-            </button>
-          </div>
-        )}
-        <div className="flex min-h-0 flex-1">
-          <div className="relative min-h-0 min-w-0 flex-1 bg-slate-50/60 dark:bg-slate-950/40" role="tabpanel">
-            {view === 'compare' && (
-              <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Drawing both flows…</p>}>
-                <CompareView diff={diff} merged={merged} resolve={resolve} definitions={definitions} />
-              </Suspense>
-            )}
-            {view === 'flow' && (
-              <>
-                <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Drawing the flow…</p>}>
-                  <div className="h-full w-full">
-                    <MergeCanvas
-                      diff={diff}
-                      merged={merged}
-                      decisions={decisions}
-                      resolve={resolve}
-                      definitions={definitions}
-                      showDeclined={showDeclined}
-                    />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {header}
+          <MergeTopBar summary={diff.summary} mode={diff.mode} view={view} onView={setView} onBulk={onBulk} onReset={reset} />
+          {view === 'compare' && (
+            <div className="flex justify-end border-b border-slate-200 px-3 py-1 dark:border-slate-700">
+              <button
+                type="button"
+                className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-pressed={showCompareReview}
+                onClick={() => setShowCompareReview((visible) => !visible)}
+              >
+                {showCompareReview ? 'Hide review panel' : `Review changes (${diff.hunks.length})`}
+              </button>
+            </div>
+          )}
+          <div className="flex min-h-48 flex-1 flex-col md:flex-row">
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-slate-50/60 dark:bg-slate-950/40" role="tabpanel">
+              {view === 'compare' && (
+                <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Drawing both flows…</p>}>
+                  <CompareView diff={diff} merged={merged} resolve={resolve} definitions={definitions} />
+                </Suspense>
+              )}
+              {view === 'flow' && (
+                <>
+                  <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Drawing the flow…</p>}>
+                    <div className="h-full w-full">
+                      <MergeCanvas
+                        diff={diff}
+                        merged={merged}
+                        decisions={decisions}
+                        resolve={resolve}
+                        definitions={definitions}
+                        showDeclined={showDeclined}
+                      />
+                    </div>
+                  </Suspense>
+                  <MergeLegend showDeclined={showDeclined} onShowDeclined={setShowDeclined} />
+                </>
+              )}
+              {view === 'changes' && (
+                <div className="mx-auto h-full max-w-3xl overflow-y-auto p-4">
+                  <ChangeList diff={diff} filter={filter} />
+                </div>
+              )}
+              {view === 'preview' && (
+                <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Loading the preview…</p>}>
+                  <div className="h-full overflow-y-auto">
+                    <MergePreview merged={merged} blockDefinitionScope={previewBlockDefinitionScope} />
                   </div>
                 </Suspense>
-                <MergeLegend showDeclined={showDeclined} onShowDeclined={setShowDeclined} />
-              </>
-            )}
-            {view === 'changes' && (
-              <div className="mx-auto h-full max-w-3xl overflow-y-auto p-4">
-                <ChangeList diff={diff} filter={filter} />
-              </div>
-            )}
-            {view === 'preview' && (
-              <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Loading the preview…</p>}>
-                <div className="h-full overflow-y-auto">
-                  <MergePreview merged={merged} blockDefinitionScope={previewBlockDefinitionScope} />
-                </div>
-              </Suspense>
+              )}
+            </div>
+            {(view !== 'compare' || showCompareReview) && (
+              <ReviewPanel
+                diff={diff}
+                decisions={decisions}
+                filter={filter}
+                onFilter={setFilter}
+                selected={selected}
+                showList={view !== 'changes'}
+              />
             )}
           </div>
-          {(view !== 'compare' || showCompareReview) && (
-            <ReviewPanel
-              diff={diff}
-              decisions={decisions}
-              issues={issues}
-              filter={filter}
-              onFilter={setFilter}
-              selected={selected}
-              showList={view !== 'changes'}
-              onApply={onApply ? apply : undefined}
-              applyLabel={applyLabel}
-              applying={applying}
-            />
-          )}
         </div>
+        {(onApply || issues.length > 0) && (
+          <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-card p-3 dark:border-slate-700">
+            {issues.length > 0 && (
+              <div className="max-h-[15dvh] overflow-y-auto break-words">
+                <IssueList issues={issues} />
+              </div>
+            )}
+            {onApply && (
+              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+                <p className="min-w-0 flex-1 text-xs text-slate-500 dark:text-slate-400">
+                  {hasErrors
+                    ? 'Fix the problems above before applying.'
+                    : hasUnresolvedConflicts
+                      ? `You can apply now; undecided conflicts keep ${currentLabel}.`
+                      : diff.hunks.length === 0
+                        ? `Applying only records that ${currentLabel} matches ${incomingLabel}.`
+                        : `Writes these decisions into ${currentLabel}. Other versions are not affected.`}
+                </p>
+                <Button type="button" className="w-full sm:w-auto" size="lg" disabled={readOnly || applying || hasErrors} onClick={apply}>
+                  <GitMerge className="h-4 w-4" /> {applying ? 'Applying…' : applyLabel ?? 'Apply merge'}
+                </Button>
+              </div>
+            )}
+          </footer>
+        )}
         {footer}
       </div>
     </MergeActionsContext.Provider>

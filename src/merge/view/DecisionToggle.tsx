@@ -4,7 +4,7 @@ import type { MergeHunk, MergeSide } from '../types';
 import { useMergeActions } from './MergeContext';
 
 /** Keep the current side or use the incoming one for a hunk; a locked hunk shows its lock instead. */
-export const DecisionToggle = ({ hunk }: { hunk: MergeHunk; compact?: boolean }) => {
+export const DecisionToggle = ({ hunk }: { hunk: MergeHunk }) => {
   const { decide, labels, readOnly, resolve } = useMergeActions();
   const side = resolve(hunk);
   if (hunk.locked) {
@@ -13,7 +13,7 @@ export const DecisionToggle = ({ hunk }: { hunk: MergeHunk; compact?: boolean })
         className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
         title={`Locked by the provider: this always follows ${labels.incoming}`}
       >
-        <Lock className="h-3 w-3" /> Follows {labels.incoming}
+        <Lock className="h-3 w-3 shrink-0" /> <span className="min-w-0 break-words">Follows {labels.incoming}</span>
       </span>
     );
   }
@@ -31,7 +31,7 @@ export const DecisionToggle = ({ hunk }: { hunk: MergeHunk; compact?: boolean })
         title={explanation}
         disabled={readOnly}
         className={cn(
-          'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed',
+          'inline-flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-left text-[11px] font-medium transition-colors disabled:cursor-not-allowed',
           active
             ? value === 'incoming'
               ? 'bg-emerald-600 text-white shadow-sm'
@@ -40,13 +40,13 @@ export const DecisionToggle = ({ hunk }: { hunk: MergeHunk; compact?: boolean })
         )}
         onClick={() => decide(hunk.id, value)}
       >
-        {active && <Check className="h-3 w-3" />}
-        {text}
+        {active && <Check className="h-3 w-3 shrink-0" />}
+        <span className="min-w-0 break-words">{text}</span>
       </button>
     );
   };
   return (
-    <div className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
+    <div className="inline-flex max-w-full rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
       {option('current', 'Keep yours')}
       {option('incoming', `Use ${labels.incoming}`)}
     </div>

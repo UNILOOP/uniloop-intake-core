@@ -30,7 +30,7 @@ export const ValueView = ({ value, className, options }: { value: unknown; class
   if (typeof value === 'string') return <span className={cn('whitespace-pre-wrap break-words', className)}>{stripHtml(value)}</span>;
   if (typeof value === 'number') return <span className={className}>{value}</span>;
   return (
-    <pre className={cn('max-h-48 overflow-auto rounded bg-slate-50 p-2 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200', className)}>
+    <pre className={cn('max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-slate-50 p-2 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200', className)}>
       {JSON.stringify(value, null, 2)}
     </pre>
   );

@@ -1,5 +1,4 @@
-import { AlertTriangle, CheckCircle2, GitMerge, Info } from 'lucide-react';
-import { Button } from '../../components/ui/button';
+import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { BlockDiffEntry, MergeDecisions, MergeIssue, SurveyDiff } from '../types';
 import { BlockInspector } from './BlockInspector';
@@ -9,15 +8,11 @@ import { useMergeActions } from './MergeContext';
 export interface ReviewPanelProps {
   diff: SurveyDiff;
   decisions: MergeDecisions;
-  issues: MergeIssue[];
   filter: ChangeFilter;
   onFilter: (filter: ChangeFilter) => void;
   selected: BlockDiffEntry | null;
   /** Whether the list belongs in this panel (false when the main area already shows it) */
   showList: boolean;
-  onApply?: () => void;
-  applyLabel?: string;
-  applying?: boolean;
 }
 
 export const IssueList = ({ issues }: { issues: MergeIssue[] }) =>
@@ -40,14 +35,13 @@ export const IssueList = ({ issues }: { issues: MergeIssue[] }) =>
     </ul>
   );
 
-/** The right-hand side: progress, filters and the list of changes, or the selected block, with the apply action. */
-export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selected, showList, onApply, applyLabel, applying }: ReviewPanelProps) => {
-  const { labels, readOnly } = useMergeActions();
+/** Review progress, filters and changes, or the selected block. */
+export const ReviewPanel = ({ diff, decisions, filter, onFilter, selected, showList }: ReviewPanelProps) => {
+  const { labels } = useMergeActions();
   const decidable = diff.hunks.filter((hunk) => !hunk.locked);
   const reviewed = decidable.filter((hunk) => decisions[hunk.id] !== undefined).length;
   const conflicts = decidable.filter((hunk) => hunk.conflict);
   const unresolved = conflicts.filter((hunk) => decisions[hunk.id] === undefined).length;
-  const errors = issues.filter((issue) => issue.level === 'error').length;
   const blockHunkIds = new Set(diff.blocks.flatMap((entry) => entry.hunks.map((hunk) => hunk.id)));
   const count = (candidate: ChangeFilter) => diff.hunks.filter((hunk) => matchesFilter(hunk, candidate, blockHunkIds.has(hunk.id))).length;
   const chips: Array<{ id: ChangeFilter; label: string }> = [
@@ -61,7 +55,7 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
   const percent = decidable.length ? Math.round((reviewed / decidable.length) * 100) : 100;
 
   return (
-    <aside className="flex w-[440px] shrink-0 flex-col border-l border-slate-200 bg-card dark:border-slate-700" aria-label="Review">
+    <aside key={selected?.key} className="max-h-[50%] min-w-0 shrink-0 overflow-y-auto border-t border-slate-200 bg-card break-words md:max-h-none md:w-[440px] md:max-w-[45%] md:border-t-0 md:border-l dark:border-slate-700" aria-label="Review">
       {selected ? (
         <BlockInspector diff={diff} entry={selected} />
       ) : (
@@ -129,7 +123,7 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
               </fieldset>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="p-3">
             {diff.hunks.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
                 <CheckCircle2 className="h-8 w-8 text-emerald-500" />
@@ -144,25 +138,6 @@ export const ReviewPanel = ({ diff, decisions, issues, filter, onFilter, selecte
           </div>
         </>
       )}
-      <footer className="space-y-2 border-t border-slate-200 p-3 dark:border-slate-700">
-        <IssueList issues={issues} />
-        {onApply && (
-          <Button type="button" className="w-full" size="lg" disabled={readOnly || applying || errors > 0} onClick={onApply}>
-            <GitMerge className="mr-2 h-4 w-4" /> {applying ? 'Applying…' : applyLabel ?? 'Apply merge'}
-          </Button>
-        )}
-        {onApply && (
-          <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
-            {errors > 0
-              ? 'Fix the problems above before applying.'
-              : unresolved > 0
-                ? `You can apply now; undecided conflicts keep ${labels.current}.`
-                : diff.hunks.length === 0
-                  ? `Applying only records that ${labels.current} matches ${labels.incoming}.`
-                  : `Writes these decisions into ${labels.current}. Other versions are not affected.`}
-          </p>
-        )}
-      </footer>
     </aside>
   );
 };

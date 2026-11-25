@@ -18,14 +18,14 @@ export const BlockInspector = ({ diff, entry }: { diff: SurveyDiff; entry: Block
   const fieldHunks = entry.hunks.filter((hunk) => hunk.category !== 'block');
 
   return (
-    <div className="flex h-full flex-col" data-inspector-key={entry.key}>
+    <div data-inspector-key={entry.key}>
       <header className="space-y-2 border-b border-slate-200 p-3 dark:border-slate-700">
         <button type="button" className="inline-flex items-center gap-1 text-xs text-slate-600 hover:underline dark:text-slate-300" onClick={() => select(null)}>
           <ChevronLeft className="h-3.5 w-3.5" /> All changes
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{entry.isPage ? `Page: ${entry.title}` : entry.title}</h3>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{entry.isPage ? `Page: ${entry.title}` : entry.title}</h3>
             <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', classes.badge)}>{NODE_STATUS_LABEL[status]}</span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -37,7 +37,7 @@ export const BlockInspector = ({ diff, entry }: { diff: SurveyDiff; entry: Block
           </p>
         </div>
       </header>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="space-y-3 p-3">
         {structural && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 p-3 dark:border-slate-700">
             <div className="min-w-0 flex-1">
@@ -47,51 +47,49 @@ export const BlockInspector = ({ diff, entry }: { diff: SurveyDiff; entry: Block
             <DecisionToggle hunk={structural} />
           </div>
         )}
-        {fieldHunks.length > 0 && (
-          <table className="w-full table-fixed border-separate border-spacing-0 text-xs">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                <th className="w-[26%] pb-2">Setting</th>
-                <th className="w-[27%] pb-2">{labels.current}</th>
-                <th className="w-[27%] pb-2">{labels.incoming}</th>
-                <th className="w-[20%] pb-2 text-right">Decision</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fieldHunks.map((hunk) => (
-                <tr key={hunk.id} className={cn('align-top', hunk.conflict && 'bg-amber-50/60 dark:bg-amber-900/20')} data-hunk-id={hunk.id}>
-                  <td className="border-t border-slate-200 py-2 pr-2 dark:border-slate-700">
-                    <div className="font-medium text-slate-800 dark:text-slate-100">{hunk.label}</div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABEL[hunk.category] ?? hunk.category}</div>
-                    <span className={cn('mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ORIGIN_CLASSES[hunk.origin])}>{originText(hunk.origin, labels)}</span>
-                    {hunk.detail && hunk.category !== 'text' && hunk.meta?.currentText === undefined && hunk.meta?.incomingText === undefined && (
-                      <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{hunk.detail}</div>
-                    )}
-                  </td>
-                  <td className="border-t border-slate-200 py-2 pr-2 dark:border-slate-700">
-                    {hunk.meta?.currentText !== undefined || hunk.meta?.incomingText !== undefined ? (
-                      <span className="text-slate-700 dark:text-slate-200">{hunk.meta.currentText ?? '—'}</span>
-                    ) : (
-                      <ValueView value={hunk.current} options={hunk.category === 'options'} />
-                    )}
-                  </td>
-                  <td className="border-t border-slate-200 py-2 pr-2 dark:border-slate-700">
-                    {hunk.meta?.currentText !== undefined || hunk.meta?.incomingText !== undefined ? (
-                      <span className="text-slate-700 dark:text-slate-200">{hunk.meta.incomingText ?? '—'}</span>
+        {fieldHunks.map((hunk) => {
+          const hasDescribedValues = hunk.meta?.currentText !== undefined || hunk.meta?.incomingText !== undefined;
+          return (
+            <section
+              key={hunk.id}
+              className={cn(
+                'space-y-2 rounded-md border border-slate-200 p-3 text-xs dark:border-slate-700',
+                hunk.conflict && 'bg-amber-50/60 dark:bg-amber-900/20'
+              )}
+              data-hunk-id={hunk.id}
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h4 className="font-medium text-slate-800 dark:text-slate-100">{hunk.label}</h4>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABEL[hunk.category] ?? hunk.category}</span>
+                <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ORIGIN_CLASSES[hunk.origin])}>{originText(hunk.origin, labels)}</span>
+              </div>
+              {hunk.detail && hunk.category !== 'text' && !hasDescribedValues && (
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">{hunk.detail}</p>
+              )}
+              <dl className="grid grid-cols-2 gap-3 text-slate-700 dark:text-slate-200">
+                <div className="min-w-0">
+                  <dt className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">{labels.current}</dt>
+                  <dd>
+                    {hasDescribedValues ? (hunk.meta?.currentText ?? '—') : <ValueView value={hunk.current} options={hunk.category === 'options'} />}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">{labels.incoming}</dt>
+                  <dd>
+                    {hasDescribedValues ? (
+                      (hunk.meta?.incomingText ?? '—')
                     ) : hunk.category === 'text' ? (
                       <TextDiff before={hunk.current} after={hunk.incoming} />
                     ) : (
                       <ValueView value={hunk.incoming} options={hunk.category === 'options'} />
                     )}
-                  </td>
-                  <td className="border-t border-slate-200 py-2 text-right dark:border-slate-700">
-                    <DecisionToggle hunk={hunk} compact />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                  </dd>
+                </div>
+              </dl>
+              <DecisionToggle hunk={hunk} />
+            </section>
+          );
+        })}
         {!structural && fieldHunks.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">This block is the same in both versions.</p>}
         {entry.isPage && entry.childKeys && entry.childKeys.length > 0 && (
           <div>

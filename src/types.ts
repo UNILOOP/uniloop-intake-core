@@ -495,6 +495,8 @@ export interface SurveyFormRendererProps {
    * `renderBlock`, or throws while rendering, the system block is shown.
    */
   blockOverrides?: BlockOverrides;
+  /** Exact definitions for a versioned survey. */
+  blockDefinitionScope?: import('./blocks').BlockDefinitionScope;
   /**
    * Values kept outside the form (e.g. a patient record). Rules can read them,
    * blocks bound to them through `external.sync` stay in step both ways, and
@@ -648,6 +650,8 @@ export interface SurveyFormContextProps {
   };
   customData?: any;
   blockOverrides?: BlockOverrides;
+  /** Exact definitions for a versioned survey. */
+  blockDefinitionScope?: import('./blocks').BlockDefinitionScope;
 }
 
 // New interfaces for conditional branching and validation

@@ -10,7 +10,7 @@ interface PreviewSurveyProps {
 }
 
 export const PreviewSurvey: React.FC<PreviewSurveyProps> = ({ layout, logo = null }) => {
-  const { state, blockOverrides } = useSurveyBuilder();
+  const { state, blockOverrides, blockDefinitionScope } = useSurveyBuilder();
 
   return (
     <div className="w-full min-w-screen min-h-screen">
@@ -24,6 +24,7 @@ export const PreviewSurvey: React.FC<PreviewSurveyProps> = ({ layout, logo = nul
           logo={logo}
           customData={state.customData}
           blockOverrides={blockOverrides}
+                blockDefinitionScope={blockDefinitionScope}
           progressBar={{
             type: 'percentage',
             showPercentage: true,

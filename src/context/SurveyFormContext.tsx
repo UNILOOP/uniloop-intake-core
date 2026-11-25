@@ -21,7 +21,7 @@ import {
   getNextStepFromNavigationRules
 } from "../utils/conditionalUtils";
 import { ThemeDefinition, themes } from "../themes";
-import { resolveBlockDefinition } from "../blocks";
+import { resolveBlockDefinition, type BlockDefinitionScope } from "../blocks";
 import { DEFAULT_LANGUAGE_CODE } from "../utils/languages";
 import {
   expandBlockValue,
@@ -136,6 +136,7 @@ interface SurveyFormProviderProps {
   customData?: any; // Custom data for custom blocks
   /** System block type to the registered block type that renders in its place. */
   blockOverrides?: BlockOverrides;
+  blockDefinitionScope?: BlockDefinitionScope;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -170,6 +171,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   analytics,
   customData,
   blockOverrides,
+  blockDefinitionScope,
   mode,
   external,
 }) => {
@@ -860,7 +862,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     if (block) {
       // validateValue checks the block's whole answer, so it runs for its own field only
       const blockDefinition = block.fieldName === fieldName
-        ? resolveBlockDefinition(block.type, blockOverrides)
+        ? resolveBlockDefinition(block.type, blockOverrides, blockDefinitionScope)
         : undefined;
       if (blockDefinition?.validateValue) {
         try {
@@ -912,7 +914,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     }
 
     return null;
-  }, [customValidators, externalRuleContext, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext, blockOverrides]);
+  }, [customValidators, externalRuleContext, values, computedValues, pages, currentPage, currentBlockIndex, evaluateConditionWithContext, blockOverrides, blockDefinitionScope]);
 
   // Calculate if the current page is valid
   const currentPageBlocks = pages[currentPage] || [];
@@ -1244,6 +1246,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
         analytics,
         customData,
         blockOverrides,
+        blockDefinitionScope,
         externalValues,
         setExternalValues,
       }}

@@ -16,7 +16,7 @@ import {
   type SurveyMode
 } from "../types";
 import { uniloop as uniTheme } from "../themes";
-import { findBlockOverride, pinBlockOverride } from "../blocks";
+import { createBlockDefinitionScope, findBlockOverride, pinBlockOverride, type BlockDefinitionScope } from "../blocks";
 import { getRuleOutputKeys, isObjectOutput } from "../utils/outputSchema";
 import { withMappedFieldMetadata } from "../utils/blockFields";
 import { getMappedFields } from "../utils/blockFields";
@@ -40,19 +40,32 @@ export const useSurveyBuilder = () => {
  */
 function applyBlockOverrides(
   blocks: Record<string, BlockDefinition>,
-  overrides: BlockOverrides | undefined
+  overrides: BlockOverrides | undefined,
+  scope: BlockDefinitionScope | undefined
 ): Record<string, BlockDefinition> {
   if (!overrides) return blocks;
   let effectiveBlocks: Record<string, BlockDefinition> | null = null;
   for (const [systemType, overrideType] of Object.entries(overrides)) {
     const system = Object.prototype.hasOwnProperty.call(blocks, systemType) ? blocks[systemType] : undefined;
     if (!system || typeof overrideType !== "string" || overrideType === systemType) continue;
-    const override = findBlockOverride(systemType, overrideType, system, blocks);
-    if (!override) continue;
+    const resolved = scope
+      ? scope.resolve(systemType, overrides)
+      : resolveBuilderOverride(systemType, overrideType, system, blocks);
+    if (!resolved) continue;
     if (!effectiveBlocks) effectiveBlocks = { ...blocks };
-    effectiveBlocks[systemType] = pinBlockOverride(systemType, system, override);
+    effectiveBlocks[systemType] = resolved;
   }
   return effectiveBlocks ?? blocks;
+}
+
+function resolveBuilderOverride(
+  systemType: string,
+  overrideType: string,
+  system: BlockDefinition,
+  blocks: Record<string, BlockDefinition>
+): BlockDefinition | undefined {
+  const override = findBlockOverride(systemType, overrideType, system, blocks);
+  return override ? pinBlockOverride(systemType, system, override) : undefined;
 }
 
 // Initial state
@@ -408,6 +421,7 @@ interface SurveyBuilderContextType {
   hideBlockLockControls: boolean;
   /** System block type to the registered block type that replaces it. */
   blockOverrides?: BlockOverrides;
+  blockDefinitionScope?: BlockDefinitionScope;
   // Field collection utilities (includes nested fields from output schemas)
   getAvailableFields: (currentBlockId: string) => string[];
   getAvailableFieldsBefore: (currentBlockId: string) => string[];
@@ -438,6 +452,7 @@ interface SurveyBuilderProviderProps {
   hideBlockLockControls?: boolean;
   /** System block type to the registered block type that replaces it. */
   blockOverrides?: BlockOverrides;
+  blockDefinitionScope?: BlockDefinitionScope;
   /**
    * Survey structure mode - determines how the survey data is organized
    * - 'paged': Traditional mode with rootNode -> pages (sets) -> blocks
@@ -458,6 +473,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   customData,
   hideBlockLockControls = false,
   blockOverrides,
+  blockDefinitionScope,
   mode = 'pageless',
   externalFields = NO_EXTERNAL_FIELDS,
 }) => {
@@ -478,9 +494,17 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
   // override shows wherever the system block it replaces would. The blocks
   // record only changes when the definitions or the mapping do.
   const stateBlocks = state.definitions.blocks;
+  const builderDefinitions = useMemo(
+    () => blockDefinitionScope ? { ...stateBlocks, ...blockDefinitionScope.definitions } : stateBlocks,
+    [stateBlocks, blockDefinitionScope]
+  );
+  const builderScope = useMemo(
+    () => blockDefinitionScope ? createBlockDefinitionScope(builderDefinitions) : undefined,
+    [builderDefinitions, blockDefinitionScope]
+  );
   const effectiveBlocks = useMemo(
-    () => applyBlockOverrides(stateBlocks, blockOverrides),
-    [stateBlocks, blockOverrides]
+    () => applyBlockOverrides(builderDefinitions, blockOverrides, builderScope),
+    [builderDefinitions, blockOverrides, builderScope]
   );
   const effectiveState = useMemo<SurveyBuilderState>(
     () =>
@@ -920,6 +944,7 @@ export const SurveyBuilderProvider: React.FC<SurveyBuilderProviderProps> = ({
     customData: state.customData,
     hideBlockLockControls,
     blockOverrides,
+    blockDefinitionScope: builderScope,
     getAvailableFields,
     getAvailableFieldsBefore,
     getAvailableFieldsUptoCurrent,

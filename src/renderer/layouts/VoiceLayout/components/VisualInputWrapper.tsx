@@ -28,10 +28,10 @@ export const VisualInputWrapper: React.FC<VisualInputWrapperProps> = ({
   const [localValue, setLocalValue] = useState(value);
   const [showingInput, setShowingInput] = useState(true);
 
-  const { blockOverrides } = useSurveyForm();
+  const { blockOverrides, blockDefinitionScope } = useSurveyForm();
   // Look the block up again once an override fails, so the system block's input is used.
   useBlockOverrideFailures();
-  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
+  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides, blockDefinitionScope);
 
   /**
    * Handle value change

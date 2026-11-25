@@ -2,7 +2,7 @@
  * Merge entry point: compare two versions of a form and build a third from them.
  *
  * @example
- * import { SurveyMergeView, diffSurveys, applyMergeDecisions } from '@/packages/survey-form-package/src/merge';
+ * import { SurveyMergeView, diffSurveys, applyMergeDecisions } from 'survey-form-package/dist/merge.mjs';
  */
 export * from './merge/index';
 export { SurveyMergeView } from './merge/view/SurveyMergeView';

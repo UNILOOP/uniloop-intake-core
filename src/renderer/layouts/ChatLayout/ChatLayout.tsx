@@ -103,6 +103,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
     surveyData,
     customData,
     blockOverrides,
+    blockDefinitionScope,
     getVisibleBlocks,
     getTotalVisibleSteps,
     getCurrentStepPosition,
@@ -182,7 +183,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
       blockFunctions?: BlockFunction[];
       definition?: ExtendedBlockDefinition;
     } => {
-      const definition = resolveBlockDefinition(block.type, blockOverrides) as
+      const definition = resolveBlockDefinition(block.type, blockOverrides, blockDefinitionScope) as
         | ExtendedBlockDefinition
         | undefined;
       return {
@@ -191,7 +192,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
         definition,
       };
     },
-    [blockOverrides]
+    [blockOverrides, blockDefinitionScope]
   );
 
   // Generate AI question for a specific field in multi-field mode

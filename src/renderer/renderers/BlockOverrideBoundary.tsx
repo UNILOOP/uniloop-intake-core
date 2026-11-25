@@ -17,6 +17,7 @@ export function RenderWith<P>({ render, props }: RenderWithProps<P>) {
 interface BlockOverrideBoundaryProps {
   systemType: string;
   overrideType: string;
+  scope?: object;
   /** What to render if the override throws: the system block's renderer, or nothing. */
   fallback: React.ReactNode;
   children?: React.ReactNode;
@@ -28,6 +29,17 @@ interface BlockOverrideBoundaryState {
 
 // Overrides that have thrown while rendering, as "systemType->overrideType".
 const failedOverrides = new Set<string>();
+const scopedFailures = new WeakMap<object, Set<string>>();
+
+function failuresFor(scope?: object): Set<string> {
+  if (!scope) return failedOverrides;
+  let failures = scopedFailures.get(scope);
+  if (!failures) {
+    failures = new Set();
+    scopedFailures.set(scope, failures);
+  }
+  return failures;
+}
 const failureListeners = new Set<() => void>();
 let failureVersion = 0;
 
@@ -56,8 +68,8 @@ export function useBlockOverrideFailures(): number {
 }
 
 /** Whether the override for `systemType` has thrown while rendering. */
-export function hasBlockOverrideFailed(systemType: string, overrideType: string): boolean {
-  return failedOverrides.has(pairKey(systemType, overrideType));
+export function hasBlockOverrideFailed(systemType: string, overrideType: string, scope?: object): boolean {
+  return failuresFor(scope).has(pairKey(systemType, overrideType));
 }
 
 /** Forgets the failures of `overrideType`, so a re-registered block is tried again. */
@@ -83,7 +95,7 @@ export class BlockOverrideBoundary extends React.Component<
   BlockOverrideBoundaryState
 > {
   state: BlockOverrideBoundaryState = {
-    failed: hasBlockOverrideFailed(this.props.systemType, this.props.overrideType),
+    failed: hasBlockOverrideFailed(this.props.systemType, this.props.overrideType, this.props.scope),
   };
 
   private unsubscribe?: () => void;
@@ -93,7 +105,7 @@ export class BlockOverrideBoundary extends React.Component<
   }
 
   private showSystemBlockIfFailed = () => {
-    if (!this.state.failed && hasBlockOverrideFailed(this.props.systemType, this.props.overrideType)) {
+    if (!this.state.failed && hasBlockOverrideFailed(this.props.systemType, this.props.overrideType, this.props.scope)) {
       this.setState({ failed: true });
     }
   };
@@ -108,10 +120,11 @@ export class BlockOverrideBoundary extends React.Component<
   }
 
   componentDidCatch(error: unknown) {
-    const { systemType, overrideType } = this.props;
+    const { systemType, overrideType, scope } = this.props;
     const key = pairKey(systemType, overrideType);
-    if (failedOverrides.has(key)) return;
-    failedOverrides.add(key);
+    const failures = failuresFor(scope);
+    if (failures.has(key)) return;
+    failures.add(key);
     console.error(
       `[blockOverrides] "${overrideType}" failed to render in place of "${systemType}", so the system block is shown instead.`,
       error

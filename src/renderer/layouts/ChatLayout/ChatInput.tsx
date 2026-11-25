@@ -61,10 +61,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [localValue, setLocalValue] = useState(value ?? '');
 
   // Get block definition to check for chatRenderer
-  const { blockOverrides } = useSurveyForm();
+  const { blockOverrides, blockDefinitionScope } = useSurveyForm();
   // Look the block up again once an override fails, so the system block's input is used.
   useBlockOverrideFailures();
-  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides);
+  const blockDefinition = resolveBlockDefinition(block.type, blockOverrides, blockDefinitionScope);
 
   // Sync local value with prop value
   useEffect(() => {

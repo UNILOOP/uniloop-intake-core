@@ -58,6 +58,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
   analytics,
   customData,
   blockOverrides,
+  blockDefinitionScope,
   mode,
   external,
 }) => {
@@ -388,6 +389,7 @@ export const SurveyForm: React.FC<SurveyFormRendererProps> = ({
             analytics={analytics}
             customData={customData}
             blockOverrides={blockOverrides}
+            blockDefinitionScope={blockDefinitionScope}
             mode={mode ?? survey.mode}
             external={external}
           >

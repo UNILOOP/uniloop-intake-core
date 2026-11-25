@@ -10,10 +10,10 @@ export const DecisionToggle = ({ hunk }: { hunk: MergeHunk }) => {
   if (hunk.locked) {
     return (
       <span
-        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+        className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
         title={`Locked by the provider: this always follows ${labels.incoming}`}
       >
-        <Lock className="h-3 w-3 shrink-0" /> <span className="min-w-0 break-words">Follows {labels.incoming}</span>
+        <Lock className="h-3 w-3 shrink-0" /> <span className="min-w-0 [overflow-wrap:anywhere]">Follows {labels.incoming}</span>
       </span>
     );
   }
@@ -40,8 +40,8 @@ export const DecisionToggle = ({ hunk }: { hunk: MergeHunk }) => {
         )}
         onClick={() => decide(hunk.id, value)}
       >
-        {active && <Check className="h-3 w-3 shrink-0" />}
-        <span className="min-w-0 break-words">{text}</span>
+        <Check className={cn('h-3 w-3 shrink-0', !active && 'invisible')} aria-hidden="true" />
+        <span className="min-w-0 [overflow-wrap:anywhere]">{text}</span>
       </button>
     );
   };

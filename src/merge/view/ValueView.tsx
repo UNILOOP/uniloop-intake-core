@@ -18,7 +18,7 @@ export const ValueView = ({ value, className, options }: { value: unknown; class
       return (
         <ul className={cn('flex flex-wrap gap-1', className)}>
           {list.map((option) => (
-            <li key={keyOf(option.value)} className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <li key={keyOf(option.value)} className="min-w-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700 [overflow-wrap:anywhere] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {option.label || option.value}
             </li>
           ))}

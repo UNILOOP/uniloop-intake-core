@@ -124,12 +124,14 @@ export const SurveyMergeView = ({
 
   return (
     <MergeActionsContext.Provider value={actions}>
-      <div className={cn('survey-merge flex h-full min-h-0 flex-col bg-background text-foreground', className)} data-mode={diff.mode}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {header}
-          <MergeTopBar summary={diff.summary} mode={diff.mode} view={view} onView={setView} onBulk={onBulk} onReset={reset} />
+      <div className={cn('survey-merge flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground', className)} data-mode={diff.mode}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="max-h-[40%] shrink-0 overflow-y-auto overscroll-contain">
+            {header}
+            <MergeTopBar summary={diff.summary} mode={diff.mode} view={view} onView={setView} onBulk={onBulk} onReset={reset} />
+          </div>
           {view === 'compare' && (
-            <div className="flex justify-end border-b border-slate-200 px-3 py-1 dark:border-slate-700">
+            <div className="flex shrink-0 justify-end border-b border-slate-200 px-3 py-1 dark:border-slate-700">
               <button
                 type="button"
                 className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -140,7 +142,7 @@ export const SurveyMergeView = ({
               </button>
             </div>
           )}
-          <div className="flex min-h-48 flex-1 flex-col md:flex-row">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
             <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-slate-50/60 dark:bg-slate-950/40" role="tabpanel">
               {view === 'compare' && (
                 <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Drawing both flows…</p>}>
@@ -165,7 +167,7 @@ export const SurveyMergeView = ({
                 </>
               )}
               {view === 'changes' && (
-                <div className="mx-auto h-full max-w-3xl overflow-y-auto p-4">
+                <div className="mx-auto h-full max-w-3xl overflow-y-auto overscroll-contain p-4 [overflow-wrap:anywhere]">
                   <ChangeList diff={diff} filter={filter} />
                 </div>
               )}
@@ -192,7 +194,7 @@ export const SurveyMergeView = ({
         {(onApply || issues.length > 0) && (
           <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-card p-3 dark:border-slate-700">
             {issues.length > 0 && (
-              <div className="max-h-[15dvh] overflow-y-auto break-words">
+              <div className="max-h-[15dvh] overflow-y-auto overscroll-contain [overflow-wrap:anywhere]">
                 <IssueList issues={issues} />
               </div>
             )}

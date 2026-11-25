@@ -55,7 +55,12 @@ export const ReviewPanel = ({ diff, decisions, filter, onFilter, selected, showL
   const percent = decidable.length ? Math.round((reviewed / decidable.length) * 100) : 100;
 
   return (
-    <aside key={selected?.key} className="max-h-[50%] min-w-0 shrink-0 overflow-y-auto border-t border-slate-200 bg-card break-words md:max-h-none md:w-[440px] md:max-w-[45%] md:border-t-0 md:border-l dark:border-slate-700" aria-label="Review">
+    <aside
+      key={selected?.key}
+      className="min-h-0 min-w-0 shrink-0 basis-3/5 overflow-y-auto overscroll-contain border-t border-slate-200 bg-card [overflow-wrap:anywhere] [scrollbar-gutter:stable] md:w-[36rem] md:max-w-[45%] md:basis-auto md:border-t-0 md:border-l dark:border-slate-700"
+      aria-label="Review"
+      tabIndex={0}
+    >
       {selected ? (
         <BlockInspector diff={diff} entry={selected} />
       ) : (

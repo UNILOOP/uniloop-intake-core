@@ -225,12 +225,16 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [conditionalErrors, setConditionalErrors] = useState<Record<string, string>>({});
   const [computedValues, setComputedValues] = useState<Record<string, any>>({});
+  const savedLocation = initialNavigationHistory?.[initialNavigationHistory.length - 1];
   const [currentPage, setCurrentPage] = useState(() => {
-    if(debug)
-      console.log('[SurveyFormProvider] Initial currentPage state:', startPage);
-    return startPage;
+    const savedPage = savedLocation?.pageUuid ? pageIds.indexOf(savedLocation.pageUuid) : -1;
+    if (savedPage >= 0) return savedPage;
+    return Number.isInteger(startPage) && startPage >= 0 && startPage < totalPages ? startPage : 0;
   });
-  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
+  const [currentBlockIndex, setCurrentBlockIndex] = useState(() => {
+    if (!savedLocation?.blockUuid || savedLocation.pageUuid !== pageIds[currentPage]) return 0;
+    return Math.max(0, pages[currentPage]?.findIndex((block) => block.uuid === savedLocation.blockUuid) ?? 0);
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(language);
 
@@ -244,7 +248,7 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
     if (initialNavigationHistory && initialNavigationHistory.length > 0) {
       // Check if the saved history has enough entries for back navigation
       // We need at least 2 entries for canGoBack to be true
-      if (initialNavigationHistory.length > 1 || startPage === 0) {
+      if (savedLocation?.pageUuid === pageIds[currentPage] && (initialNavigationHistory.length > 1 || currentPage === 0)) {
         if(debug)
           console.log('[SurveyFormProvider] Using restored navigation history:', initialNavigationHistory);
         return initialNavigationHistory;
@@ -256,15 +260,15 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
     // Build complete navigation history from page 0 to startPage
     // This ensures users can navigate backward when resuming
-    const baseTimestamp = Date.now() - (startPage * 1000); // Stagger timestamps
+    const baseTimestamp = Date.now() - (currentPage * 1000); // Stagger timestamps
     const initialHistory: NavigationHistoryEntry[] = [];
 
-    for (let i = 0; i <= startPage; i++) {
+    for (let i = 0; i <= currentPage; i++) {
       const pageUuid = pageIds[i];
       if (pageUuid) {
         initialHistory.push({
           pageUuid,
-          blockUuid: undefined,
+          blockUuid: i === currentPage ? pages[i]?.[currentBlockIndex]?.uuid : undefined,
           timestamp: baseTimestamp + (i * 1000),
           trigger: i === 0 ? 'initial' : 'forward'
         });
@@ -315,8 +319,8 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
 
   // Call onPageChange when component mounts with startPage
   useEffect(() => {
-    if (startPage > 0 && onPageChange) {
-      onPageChange(startPage, totalPages);
+    if ((currentPage > 0 || currentPage !== startPage) && onPageChange) {
+      onPageChange(currentPage, totalPages);
     }
   }, []); // Only run once on mount
 
@@ -425,17 +429,6 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       });
     }
   }, [initialValues]);
-
-  // Ensure page is set when component mounts with startPage
-  // Note: Navigation history is already built in useState initializer above
-  useEffect(() => {
-    if (startPage > 0) {
-      if(debug)
-        console.log('[SurveyFormProvider] Setting initial page to:', startPage);
-      setCurrentPage(startPage);
-      setCurrentBlockIndex(0);
-    }
-  }, []); // Only run once on mount
 
   // Helper functions to work with UUIDs
   const getPageUuidByIndex = useCallback((pageIndex: number): string | null => {
@@ -604,12 +597,11 @@ export const SurveyFormProvider: React.FC<SurveyFormProviderProps> = ({
       }, 100);
     };
 
-    // Add initial state to browser history with startPage UUID
-    const initialPageUuid = pageIds[startPage] || pageIds[0] || '';
+    const initialPageUuid = pageIds[currentPageRef.current] || '';
     window.history.replaceState(
       {
         surveyPageUuid: initialPageUuid,
-        surveyBlockUuid: undefined,
+        surveyBlockUuid: pages[currentPageRef.current]?.[currentBlockIndexRef.current]?.uuid,
         timestamp: Date.now()
       },
       '',

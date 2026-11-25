@@ -76,6 +76,7 @@ export interface RuleValueInput {
 // Helper to convert enhanced rule to standard NavigationRule format
 export function enhancedRuleToStandard(rule: EnhancedNavigationRule): string {
   const { field, operator, value } = rule;
+  if (!field.trim()) return '';
   
   // Handle different operator types
   switch (operator) {

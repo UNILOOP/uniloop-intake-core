@@ -1,5 +1,5 @@
 import React from 'react';
-import { resolveBlockDefinition } from '../../blocks';
+import { resolveBlockDefinition, type BlockDefinitionScope } from '../../blocks';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { cn } from '../../lib/utils';
@@ -27,6 +27,7 @@ export interface SurveyAnswerRendererProps {
   blockDefinitions?: Record<string, BlockDefinition>;
   /** The form's block overrides, so overridden blocks show their override's view */
   blockOverrides?: BlockOverrides;
+  blockDefinitionScope?: BlockDefinitionScope;
   /** Shows questions and descriptions in this language when the form has localizations for it */
   language?: string;
   /** Lists questions with no answer as "Not provided"; hidden by default */
@@ -91,6 +92,7 @@ export function SurveyAnswerRenderer({
   answers,
   blockDefinitions,
   blockOverrides,
+  blockDefinitionScope,
   language = DEFAULT_LANGUAGE_CODE,
   showUnanswered = false,
   showBlockType = false,
@@ -99,6 +101,7 @@ export function SurveyAnswerRenderer({
   const localizations = form && !Array.isArray(form) && 'rootNode' in form ? form.localizations : undefined;
 
   const definitionFor = (type: string): BlockDefinition | undefined =>
+    blockDefinitionScope ? blockDefinitionScope.resolve(type, blockOverrides) :
     (blockDefinitions && Object.prototype.hasOwnProperty.call(blockDefinitions, type)
       ? blockDefinitions[type]
       : undefined) ?? resolveBlockDefinition(type, blockOverrides);

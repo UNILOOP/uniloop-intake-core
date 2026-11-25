@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import type { BlockDefinitionScope } from '../../blocks';
 import { cn } from '../../lib/utils';
 import type { BlockDefinition } from '../../types';
 import { bulkDecisions } from '../decisions';
@@ -24,6 +25,7 @@ export interface SurveyMergeViewProps {
   /** The version both started from, when known */
   base?: SurveySnapshot | null;
   blockDefinitions?: BlockDefinition[];
+  previewBlockDefinitionScope?: BlockDefinitionScope;
   labels?: Partial<MergeLabels>;
   /** Controlled decisions; omit to let the view keep them */
   decisions?: MergeDecisions;
@@ -52,6 +54,7 @@ export const SurveyMergeView = ({
   incoming,
   base,
   blockDefinitions,
+  previewBlockDefinitionScope,
   labels,
   decisions: controlledDecisions,
   initialDecisions,
@@ -164,7 +167,7 @@ export const SurveyMergeView = ({
             {view === 'preview' && (
               <Suspense fallback={<p className="animate-pulse p-6 text-sm text-slate-500">Loading the preview…</p>}>
                 <div className="h-full overflow-y-auto">
-                  <MergePreview merged={merged} />
+                  <MergePreview merged={merged} blockDefinitionScope={previewBlockDefinitionScope} />
                 </div>
               </Suspense>
             )}

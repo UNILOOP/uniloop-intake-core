@@ -13,6 +13,7 @@ import { SurveyGraph } from "./SurveyGraph";
 import { ThemeBuilder } from "./panels/ThemeBuilder";
 import { PreviewSurvey } from "./panels/PreviewSurvey";
 import { FlowV3Builder } from "../flowv3";
+import type { BlockDefinitionScope } from "../../blocks";
 import type { ExternalField } from "../../external";
 
 // Define the props
@@ -50,6 +51,7 @@ interface SurveyBuilderProps {
    * system type. Pass the same mapping to `SurveyForm`.
    */
   blockOverrides?: BlockOverrides;
+  blockDefinitionScope?: BlockDefinitionScope;
   /**
    * Keys kept outside the form (e.g. patient fields). Navigation, validation and
    * other rule editors list them after block fields, and global custom fields
@@ -81,10 +83,11 @@ export const SurveyBuilder = forwardRef<SurveyBuilderHandle, SurveyBuilderProps>
   editorType = 'full',
   hideBlockLockControls = false,
   blockOverrides,
+  blockDefinitionScope,
   externalFields,
 }, ref) => {
   return (
-    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} mode={mode} externalFields={externalFields}>
+    <SurveyBuilderProvider initialData={initialData} customData={customData} hideBlockLockControls={hideBlockLockControls} blockOverrides={blockOverrides} blockDefinitionScope={blockDefinitionScope} mode={mode} externalFields={externalFields}>
       <SurveyBuilderContent
         ref={ref}
         onDataChange={onDataChange}

@@ -140,6 +140,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
     surveyData,
     customData,
     blockOverrides,
+    blockDefinitionScope,
     getVisibleBlocks,
     getTotalVisibleSteps,
     getCurrentStepPosition,
@@ -221,7 +222,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
   const currentQuestionIndex = getCurrentStepPosition?.() ?? 0;
 
   // Get block definition to check for disableAudioInput
-  const currentBlockDefinition = currentBlock ? resolveBlockDefinition(currentBlock.type, blockOverrides) : undefined;
+  const currentBlockDefinition = currentBlock ? resolveBlockDefinition(currentBlock.type, blockOverrides, blockDefinitionScope) : undefined;
 
   // Check if audio input should be disabled (check both block instance and definition)
   const shouldDisableAudioInput =
@@ -377,7 +378,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
       }
 
       // Get block definition to check for skipAIValidation
-      const blockDefinition = resolveBlockDefinition(currentBlock.type, blockOverrides);
+      const blockDefinition = resolveBlockDefinition(currentBlock.type, blockOverrides, blockDefinitionScope);
 
       // Check if AI validation should be skipped (check both block instance and definition)
       const shouldSkipAIValidation =
@@ -681,7 +682,7 @@ export const VoiceLayout: React.FC<VoiceLayoutProps> = ({
         proceedToNextOrSubmit(fieldName, transcript);
       }, 300);
     },
-    [currentBlock, setValue, voiceCustomData, validateAnswer, awaitingConfirmation, pendingValidation, resetMultiSelectState, proceedToNextOrSubmit, clearSubsequentBlocksData, blockOverrides]
+    [currentBlock, setValue, voiceCustomData, validateAnswer, awaitingConfirmation, pendingValidation, resetMultiSelectState, proceedToNextOrSubmit, clearSubsequentBlocksData, blockOverrides, blockDefinitionScope]
   );
 
   // Prepare session handlers from customData (including TTS/STT/MediaCapture)

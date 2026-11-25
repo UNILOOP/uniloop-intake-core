@@ -142,6 +142,8 @@ export {
   registerBlock,
   unregisterBlock,
   resolveBlockDefinition,
+  createBlockDefinitionScope,
+  type BlockDefinitionScope,
 } from './blocks';
 
 // Answer views (saved answers shown read-only, e.g. for clinicians)

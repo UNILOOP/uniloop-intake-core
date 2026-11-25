@@ -12,7 +12,7 @@ import { localizeBlockForRendering } from '../../utils/surveyUtils';
  */
 export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props, _ref) => {
   const { block, value, onChange, onBlur, error, disabled, customComponents, theme = null, isVisible } = props;
-  const { analytics, enableDebug, abTestPreviewMode, language, surveyData, blockOverrides } = useSurveyForm();
+  const { analytics, enableDebug, abTestPreviewMode, language, surveyData, blockOverrides, blockDefinitionScope } = useSurveyForm();
 
   // Apply A/B testing variant selection if enabled
   const blockToRender = useMemo(() => {
@@ -41,7 +41,7 @@ export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props,
   ) : null;
 
   // If there's a custom component for this block type, use it
-  if (customComponents && customComponents[blockToRender.type]) {
+  if (!blockDefinitionScope && customComponents && customComponents[blockToRender.type]) {
     const CustomComponent = customComponents[blockToRender.type] as React.FC<BlockRendererProps>;
     return (
       <>
@@ -52,7 +52,10 @@ export const BlockRenderer = forwardRef<HTMLElement, BlockRendererProps>((props,
   }
 
   // Check if we have a unified block definition with renderBlock method
-  const blockDefinition = resolveBlockDefinition(blockToRender.type, blockOverrides);
+  const blockDefinition = resolveBlockDefinition(blockToRender.type, blockOverrides, blockDefinitionScope);
+  if (blockDefinitionScope && !blockDefinition) {
+    return <p role="alert">This part of the form is unavailable. Please reload the page or contact your care team.</p>;
+  }
   if (blockDefinition?.renderBlock) {
     return (
       <>

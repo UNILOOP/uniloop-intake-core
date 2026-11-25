@@ -131,29 +131,22 @@ export function getBlockDefinition(type: string): BlockDefinition | undefined {
     return wrappedBlockCache.get(type);
   }
 
-  // If the block doesn't have a renderBlock method, return as-is
-  if (!baseDefinition.renderBlock) {
-    return baseDefinition;
-  }
+  const wrappedDefinition = wrapBlock(baseDefinition, type);
+  wrappedBlockCache.set(type, wrappedDefinition);
+  return wrappedDefinition;
+}
 
-  // Create wrapped definition with BlockMountGuard
-  const wrappedDefinition: BlockDefinition = {
-    ...baseDefinition,
+function wrapBlock(definition: BlockDefinition, type: string, scopeId?: number): BlockDefinition {
+  if (!definition.renderBlock) return definition;
+
+  return {
+    ...definition,
     renderBlock: (props: BlockRendererProps) => {
-      const blockId = props.block.uuid || props.block.fieldName || `${type}_${props.block.label || 'unnamed'}`;
-
-      return React.createElement(
-        BlockMountGuard,
-        { blockId },
-        baseDefinition.renderBlock!(props)
-      );
+      const identifier = props.block.uuid || props.block.fieldName || `${type}_${props.block.label || 'unnamed'}`;
+      const blockId = scopeId === undefined ? identifier : `${scopeId}:${identifier}`;
+      return React.createElement(BlockMountGuard, { blockId }, definition.renderBlock!(props));
     },
   };
-
-  // Cache the wrapped definition
-  wrappedBlockCache.set(type, wrappedDefinition);
-
-  return wrappedDefinition;
 }
 
 // Helper function to get all block definitions
@@ -186,7 +179,20 @@ const pinnedOverrideCache = new WeakMap<
   BlockDefinition,
   Map<string, { system: BlockDefinition | undefined; pinned: BlockDefinition }>
 >();
+type BlockScopeIdentity = { id: number };
+
+const scopedOverrideCaches = new WeakMap<BlockScopeIdentity, typeof pinnedOverrideCache>();
 const warnedOverrides = new Set<string>();
+
+function overridesFor(scope?: BlockScopeIdentity): typeof pinnedOverrideCache {
+  if (!scope) return pinnedOverrideCache;
+  let cache = scopedOverrideCaches.get(scope);
+  if (!cache) {
+    cache = new WeakMap();
+    scopedOverrideCaches.set(scope, cache);
+  }
+  return cache;
+}
 // The system block's behaviour behind a failed override's renderers, per pinned definition.
 const failedOverrideCache = new WeakMap<BlockDefinition, BlockDefinition>();
 
@@ -194,15 +200,17 @@ function withOverrideFallback<P>(
   systemType: string,
   overrideType: string,
   render: (props: P) => JSX.Element | null,
-  fallback: ((props: P) => JSX.Element | null) | undefined
+  fallback: ((props: P) => JSX.Element | null) | undefined,
+  scope?: BlockScopeIdentity
 ): (props: P) => JSX.Element {
   return (props: P) =>
     React.createElement(
       BlockOverrideBoundary,
       {
-        key: overrideType,
+        key: scope ? `${scope.id}:${overrideType}` : overrideType,
         systemType,
         overrideType,
+        scope,
         fallback: fallback ? React.createElement(RenderWith<P>, { render: fallback, props }) : null,
       },
       React.createElement(RenderWith<P>, { render, props })
@@ -219,7 +227,7 @@ export function findBlockOverride(
   type: string,
   overrideType: string,
   system: BlockDefinition | undefined,
-  blocks?: Record<string, BlockDefinition>
+  blocks?: Readonly<Record<string, BlockDefinition>>
 ): BlockDefinition | undefined {
   let override: BlockDefinition | undefined;
   if (blocks && Object.prototype.hasOwnProperty.call(blocks, overrideType)) override = blocks[overrideType];
@@ -250,9 +258,11 @@ export function findBlockOverride(
 export function pinBlockOverride(
   type: string,
   system: BlockDefinition | undefined,
-  override: BlockDefinition
+  override: BlockDefinition,
+  scope?: BlockScopeIdentity
 ): BlockDefinition {
-  let pairs = pinnedOverrideCache.get(override);
+  const cache = overridesFor(scope);
+  let pairs = cache.get(override);
   const cached = pairs?.get(type);
   if (cached && cached.system === system) return cached.pinned;
 
@@ -279,7 +289,8 @@ export function pinBlockOverride(
       type,
       override.type,
       override.renderBlock.bind(override),
-      system?.renderBlock?.bind(system)
+      system?.renderBlock?.bind(system),
+      scope
     );
   }
   if (override.chatRenderer) {
@@ -287,13 +298,14 @@ export function pinBlockOverride(
       type,
       override.type,
       override.chatRenderer.bind(override),
-      system?.chatRenderer?.bind(system)
+      system?.chatRenderer?.bind(system),
+      scope
     );
   }
 
   if (!pairs) {
     pairs = new Map();
-    pinnedOverrideCache.set(override, pairs);
+    cache.set(override, pairs);
   }
   pairs.set(type, { system, pinned });
   return pinned;
@@ -308,19 +320,51 @@ export function pinBlockOverride(
  */
 export function resolveBlockDefinition(
   type: string,
-  overrides?: BlockOverrides
+  overrides?: BlockOverrides,
+  scope?: BlockDefinitionScope
+): BlockDefinition | undefined {
+  if (scope) return scope.resolve(type, overrides);
+
+  return resolveDefinition(type, overrides, getBlockDefinition, undefined);
+}
+
+export type BlockDefinitionScope = {
+  definitions: Readonly<Record<string, BlockDefinition>>;
+  resolve: (type: string, overrides?: BlockOverrides) => BlockDefinition | undefined;
+};
+
+let nextScopeId = 0;
+
+/** Build an isolated registry for the definitions selected for one survey. */
+export function createBlockDefinitionScope(definitions: Readonly<Record<string, BlockDefinition>>): BlockDefinitionScope {
+  const scope = { id: nextScopeId++ };
+  const scopedDefinitions = Object.fromEntries(
+    Object.entries(definitions).map(([type, definition]) => [type, wrapBlock(definition, type, scope.id)])
+  );
+  const getDefinition = (type: string): BlockDefinition | undefined =>
+    Object.prototype.hasOwnProperty.call(scopedDefinitions, type) ? scopedDefinitions[type] : undefined;
+
+  return {
+    definitions: Object.freeze({ ...definitions }),
+    resolve: (type, overrides) => resolveDefinition(type, overrides, getDefinition, scope),
+  };
+}
+
+function resolveDefinition(
+  type: string,
+  overrides: BlockOverrides | undefined,
+  getDefinition: (type: string) => BlockDefinition | undefined,
+  scope: BlockScopeIdentity | undefined
 ): BlockDefinition | undefined {
   const overrideType = overrides?.[type];
-  if (typeof overrideType !== "string" || !overrideType || overrideType === type) {
-    return getBlockDefinition(type);
-  }
+  const system = getDefinition(type);
+  if (typeof overrideType !== "string" || !overrideType || overrideType === type) return system;
 
-  const system = getBlockDefinition(type);
-  const override = findBlockOverride(type, overrideType, system);
-  if (!override) return system;
+  const override = scope ? getDefinition(overrideType) : findBlockOverride(type, overrideType, system);
+  if (!override || (system?.renderBlock && !override.renderBlock)) return system;
 
-  const pinned = pinBlockOverride(type, system, override);
-  if (!system || !hasBlockOverrideFailed(type, overrideType)) return pinned;
+  const pinned = pinBlockOverride(type, system, override, scope);
+  if (!system || !hasBlockOverrideFailed(type, overrideType, scope)) return pinned;
 
   // The override has thrown, so its boundaries show the system block. Validate
   // and describe the answer as the system block does too. A renderer the system
